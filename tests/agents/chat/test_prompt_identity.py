@@ -79,8 +79,34 @@ def test_blank_identity_falls_back_to_product():
 
 def test_shipped_yaml_carries_partner_templates():
     root = Path(__file__).resolve().parents[3] / "deeptutor/agents/chat/prompts"
-    for lang in ("en", "zh"):
-        data = yaml.safe_load((root / lang / "agentic_chat.yaml").read_text())
-        assert "{name}" in data["general_partner"]
-        assert "{description}" in data["general_partner_description"]
-        assert "partner_turn_policy" in data
+    data = yaml.safe_load(
+        (root / "en" / "agentic_chat.yaml").read_text(encoding="utf-8")
+    )
+    assert "{name}" in data["general_partner"]
+    assert "{description}" in data["general_partner_description"]
+    assert "partner_turn_policy" in data
+    assert not list((root / "zh").glob("*.yaml"))
+
+
+def test_normal_chat_prompt_enables_selective_math_and_diagrams():
+    root = Path(__file__).resolve().parents[3] / "deeptutor/agents/chat/prompts"
+    prompts = yaml.safe_load(
+        (root / "en" / "agentic_chat.yaml").read_text(encoding="utf-8")
+    )
+    assembler = ChatPromptAssembler(prompts=prompts, language="en")
+
+    blocks = assembler.blocks(
+        context=UnifiedContext(user_message="Explain a compiler pipeline"),
+        tool_manifest="- none",
+    )
+    names = [block.name for block in blocks]
+    policy = next(block.content for block in blocks if block.name == "visual_explanations")
+
+    assert names.index("visual_explanations") < names.index("loop")
+    assert "`$...$`" in policy
+    assert "`$$...$$`" in policy
+    assert "fenced `mermaid` diagram" in policy
+    assert "Do not require a visualization mode" in policy
+    assert "portable Mermaid 11 syntax" in policy
+    assert "no HTML or click directives" in policy
+    assert "Prefer prose for simple answers" in policy

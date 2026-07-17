@@ -190,9 +190,7 @@ class AgenticChatPipeline:
         max_tokens: int | None = None,
     ) -> None:
         normalized_language = (language or "en").strip().lower()
-        if normalized_language.startswith("zh"):
-            self.language = "zh"
-        elif normalized_language in {"hi", "hindi", "hinglish"}:
+        if normalized_language in {"hi", "hindi", "hinglish"}:
             self.language = "hi"
         elif normalized_language in {"bundeli", "bundelkhandi"}:
             self.language = "bundeli"
@@ -960,7 +958,7 @@ class AgenticChatPipeline:
                 else:
                     mime = getattr(first_image, "mime_type", "") or "image/png"
                     kwargs["image_base64"] = f"data:{mime};base64,{raw_b64}"
-            kwargs["language"] = context.language or "zh"
+            kwargs["language"] = context.language or "en"
         for cap in self._active_loop_capabilities(context):
             kwargs = cap.augment_kwargs(tool_name, kwargs, context)
         return kwargs

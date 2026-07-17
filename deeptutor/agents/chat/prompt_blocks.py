@@ -14,7 +14,16 @@ class ChatPromptAssembler:
 
     def __init__(self, *, prompts: dict[str, Any], language: str) -> None:
         self.prompts = prompts
-        self.language = "zh" if language.lower().startswith("zh") else "en"
+        normalized_language = (language or "en").strip().lower()
+        if normalized_language in {"hi", "hindi", "hinglish"}:
+            self.language = "hi"
+        elif normalized_language in {"bundeli", "bundelkhandi"}:
+            self.language = "bundeli"
+        elif normalized_language in {"awadhi", "bhojpuri"}:
+            self.language = normalized_language
+        else:
+            # Drona does not expose the legacy Chinese chat prompt path.
+            self.language = "en"
 
     def system_prompt(
         self,
@@ -58,8 +67,11 @@ class ChatPromptAssembler:
         blocks: list[PromptBlock] = [
             PromptBlock("general", self._general_block(context)),
             PromptBlock("runtime_policy", self._t("runtime_policy")),
-            PromptBlock("loop", self._t("loop.system")),
         ]
+        visual_explanations = self._t("visual_explanations")
+        if visual_explanations:
+            blocks.append(PromptBlock("visual_explanations", visual_explanations))
+        blocks.append(PromptBlock("loop", self._t("loop.system")))
         # Capability playbooks sit high so they frame the whole turn when active;
         # empty blocks are omitted by ``system_prompt``'s join.
         blocks.extend(capability_blocks or [])
@@ -153,7 +165,7 @@ class ChatPromptAssembler:
         )
 
     def _fallback_empty_tool_list(self) -> str:
-        return "- 无" if self.language == "zh" else "- none"
+        return "- none"
 
     def _t(self, key: str, default: str = "") -> str:
         value: Any = self.prompts

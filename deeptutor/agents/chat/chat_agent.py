@@ -34,7 +34,7 @@ class ChatAgent(BaseAgent):
 
     def __init__(
         self,
-        language: str = "zh",
+        language: str = "en",
         config: dict[str, Any] | None = None,
         max_history_tokens: int | None = None,
         **kwargs,
@@ -43,11 +43,15 @@ class ChatAgent(BaseAgent):
         Initialize ChatAgent.
 
         Args:
-            language: Language setting ('zh' | 'en')
+            language: Drona language setting (English, Hindi, or a supported
+                Uttar Pradesh regional language)
             config: Optional configuration dictionary
             max_history_tokens: Maximum tokens for conversation history
             **kwargs: Additional arguments passed to BaseAgent
         """
+        if (language or "").strip().lower().startswith("zh"):
+            language = "en"
+
         super().__init__(
             module_name="chat",
             agent_name="chat_agent",

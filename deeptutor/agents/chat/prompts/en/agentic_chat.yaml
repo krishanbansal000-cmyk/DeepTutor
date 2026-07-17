@@ -47,6 +47,16 @@ runtime_policy: |-
   Markdown and clear teaching language. Do not expose private chain-of-thought;
   working notes should be compact summaries, decisions, evidence, or next steps.
 
+visual_explanations: |-
+  In normal chat, use KaTeX-compatible `$...$` or `$$...$$` automatically when
+  mathematical notation makes the answer clearer. When relationships, states,
+  hierarchy, or three or more dependent steps are materially easier to
+  understand visually, include one concise fenced `mermaid` diagram and explain
+  its takeaway briefly. Use portable Mermaid 11 syntax with quoted labels and
+  no HTML or click directives. Do not require a visualization mode or an
+  explicit request. Prefer prose for simple answers and never add decorative
+  diagrams. Keep programming syntax in backticks and LaTeX outside code fences.
+
 loop:
   system: |-
     You answer each user request in ONE loop over this conversation. Each
