@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useTranslation } from "react-i18next";
 import { ChevronRight, Rocket, type LucideIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { apiFetch, apiUrl } from "@/lib/api";
 import {
@@ -12,11 +12,16 @@ import {
   type ServiceReadiness,
 } from "@/components/settings/SettingsContext";
 import SettingsStatusPanel from "@/components/settings/SettingsStatusPanel";
+import ExperienceModeSelector from "@/components/settings/ExperienceModeSelector";
 import {
   SETTINGS_CATEGORIES,
   type Lang,
   type SettingsCategory,
 } from "@/lib/settings-nav";
+import {
+  isAdvancedExperience,
+  settingsCategoryVisible,
+} from "@/lib/experience-mode";
 
 /**
  * Settings hub — the landing page of `/settings`.
@@ -33,12 +38,20 @@ type NetworkPreview = {
 };
 
 export default function SettingsHub() {
-  const { i18n } = useTranslation();
-  const zh = i18n.language?.toLowerCase().startsWith("zh");
-  const tr = useCallback((l: Lang) => (zh ? l.zh : l.en), [zh]);
+  const { t } = useTranslation();
+  const tr = useCallback((label: Lang) => label.en, []);
 
-  const { catalog, catalogEditable, diagnosticsResults, startTour } =
-    useSettings();
+  const {
+    catalog,
+    catalogEditable,
+    diagnosticsResults,
+    experienceMode,
+    startTour,
+  } = useSettings();
+  const advanced = isAdvancedExperience(experienceMode);
+  const visibleCategories = SETTINGS_CATEGORIES.filter((category) =>
+    settingsCategoryVisible(experienceMode, category.key),
+  );
 
   // Model preview: how many of the model-service leaves are configured.
   const modelStats = useMemo(() => {
@@ -69,6 +82,7 @@ export default function SettingsHub() {
   // quietly (non-admins get 403) → the block falls back to its blurb.
   const [network, setNetwork] = useState<NetworkPreview | null>(null);
   useEffect(() => {
+    if (!advanced) return;
     let cancelled = false;
     (async () => {
       try {
@@ -86,36 +100,39 @@ export default function SettingsHub() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [advanced]);
 
   return (
     <div>
       <header className="mb-7 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-serif text-[24px] font-semibold leading-tight tracking-tight text-[var(--foreground)]">
-            {tr({ zh: "设置", en: "Settings" })}
+            {t("Settings")}
           </h1>
           <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-[var(--muted-foreground)]">
-            {tr({
-              zh: "管理外观、模型与服务、知识库、聊天与记忆。",
-              en: "Manage appearance, models and services, knowledge base, chat, and memory.",
-            })}
+            {advanced
+              ? t(
+                  "Manage appearance, models and services, knowledge base, chat, and memory.",
+                )
+              : t("Choose the Drona experience and language that suit you.")}
           </p>
         </div>
-        <button
+        {advanced && <button
           type="button"
           onClick={startTour}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border)]/60 px-3 py-1.5 text-[12.5px] font-medium text-[var(--muted-foreground)] transition-colors hover:border-[var(--border)] hover:text-[var(--foreground)]"
         >
           <Rocket size={13} />
-          {tr({ zh: "引导", en: "Tour" })}
-        </button>
+          {t("Tour")}
+        </button>}
       </header>
 
-      <SettingsStatusPanel />
+      <ExperienceModeSelector />
+
+      {advanced && <SettingsStatusPanel />}
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {SETTINGS_CATEGORIES.map((category) => (
+        {visibleCategories.map((category) => (
           <CategoryBlock
             key={category.key}
             category={category}

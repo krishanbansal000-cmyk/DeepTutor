@@ -31,6 +31,7 @@ interface FileDropZoneProps {
   disabled?: boolean;
   compact?: boolean;
   hidePolicyHint?: boolean;
+  allowFolderSelection?: boolean;
 }
 
 export default function FileDropZone({
@@ -40,6 +41,7 @@ export default function FileDropZone({
   disabled = false,
   compact = false,
   hidePolicyHint = false,
+  allowFolderSelection = true,
 }: FileDropZoneProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -209,7 +211,7 @@ export default function FileDropZone({
         </div>
       </button>
 
-      {!disabled && (
+      {!disabled && allowFolderSelection && (
         <button
           type="button"
           onClick={() => dirInputRef.current?.click()}
@@ -243,17 +245,19 @@ export default function FileDropZone({
 
       {/* Directory picker — files carry webkitRelativePath so the upload keeps
           the folder structure. Unsupported members are flagged, not blocked. */}
-      <input
-        ref={setDirInput}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={(event) => {
-          const picked = Array.from(event.target.files || []);
-          event.target.value = "";
-          onChange(mergeSelectedFiles(files, picked));
-        }}
-      />
+      {allowFolderSelection && (
+        <input
+          ref={setDirInput}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(event) => {
+            const picked = Array.from(event.target.files || []);
+            event.target.value = "";
+            onChange(mergeSelectedFiles(files, picked));
+          }}
+        />
+      )}
 
       {selection.items.length > 0 && (
         <SelectionSummary

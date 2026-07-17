@@ -26,6 +26,8 @@ import KbFilesTab from "./KbFilesTab";
 import KbDocumentsSection from "./KbDocumentsSection";
 import KbIndexVersionsSection from "./KbIndexVersionsSection";
 import KbSettingsSection from "./KbSettingsSection";
+import { useAppShell } from "@/context/AppShellContext";
+import { isAdvancedExperience, knowledgeLabel } from "@/lib/experience-mode";
 
 type DetailSection = "files" | "add" | "versions" | "settings";
 
@@ -73,6 +75,8 @@ export default function KnowledgeBaseDetail({
   onBack,
 }: KnowledgeBaseDetailProps) {
   const { t } = useTranslation();
+  const { experienceMode } = useAppShell();
+  const advancedExperience = isAdvancedExperience(experienceMode);
   const [section, setSection] = useState<DetailSection>("files");
   const [retrySubmitting, setRetrySubmitting] = useState(false);
 
@@ -130,7 +134,12 @@ export default function KnowledgeBaseDetail({
     }
   };
 
-  const fullBleed = FULL_BLEED_SECTIONS.has(section);
+  const effectiveSection =
+    advancedExperience || section !== "versions" ? section : "files";
+  const visibleSections = advancedExperience
+    ? SECTIONS
+    : SECTIONS.filter(({ key }) => key !== "versions");
+  const fullBleed = FULL_BLEED_SECTIONS.has(effectiveSection);
 
   return (
     <main className="flex h-full flex-1 flex-col overflow-hidden bg-[var(--background)]">
@@ -145,7 +154,7 @@ export default function KnowledgeBaseDetail({
                 className="mb-1.5 inline-flex items-center gap-1 text-[11.5px] font-medium text-[var(--muted-foreground)] transition-colors hover:text-[var(--foreground)]"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
-                {t("Knowledge bases")}
+                {t(knowledgeLabel(experienceMode))}
               </button>
             )}
             <div className="flex flex-wrap items-center gap-2">
@@ -169,10 +178,18 @@ export default function KnowledgeBaseDetail({
               />
             </div>
             <p className="mt-1 text-[12px] text-[var(--muted-foreground)]">
-              {provider} · {embeddingLabel} · {t("Updated")} {updatedLabel}
-              {lastIndexedLabel
-                ? ` · ${t("Last indexed")} ${lastIndexedLabel}`
-                : ""}
+              {advancedExperience ? (
+                <>
+                  {provider} · {embeddingLabel} · {t("Updated")} {updatedLabel}
+                  {lastIndexedLabel
+                    ? ` · ${t("Last indexed")} ${lastIndexedLabel}`
+                    : ""}
+                </>
+              ) : (
+                <>
+                  {t("Updated")} {updatedLabel}
+                </>
+              )}
             </p>
           </div>
           {canRetry && (
@@ -192,15 +209,17 @@ export default function KnowledgeBaseDetail({
               )}
               {retrySubmitting || isReindexingLocally
                 ? t("Retrying…")
-                : t("Retry indexing")}
+                : advancedExperience
+                  ? t("Retry indexing")
+                  : t("Try again")}
             </button>
           )}
         </div>
 
         {/* Section nav */}
         <nav className="-mb-3 mt-3 flex gap-1 overflow-x-auto">
-          {SECTIONS.map(({ key, label, Icon }) => {
-            const active = section === key;
+          {visibleSections.map(({ key, label, Icon }) => {
+            const active = effectiveSection === key;
             return (
               <button
                 key={key}
@@ -213,7 +232,9 @@ export default function KnowledgeBaseDetail({
                 }`}
               >
                 <Icon size={13} />
-                {t(label)}
+                {t(
+                  !advancedExperience && key === "settings" ? "Manage" : label,
+                )}
               </button>
             );
           })}
@@ -222,12 +243,12 @@ export default function KnowledgeBaseDetail({
 
       {/* Body */}
       <div className="min-h-0 flex-1 overflow-hidden">
-        {section === "files" ? (
+        {effectiveSection === "files" ? (
           <KbFilesTab key={kb.name} kb={kb} task={task} />
         ) : (
           <div className="h-full overflow-y-auto px-6 py-5">
             <div className={fullBleed ? "" : "mx-auto max-w-3xl"}>
-              {section === "add" && (
+              {effectiveSection === "add" && (
                 <KbDocumentsSection
                   kb={kb}
                   uploadPolicy={uploadPolicy}
@@ -238,9 +259,10 @@ export default function KnowledgeBaseDetail({
                   onUpload={(files) =>
                     kb.read_only ? Promise.resolve() : onUpload(kb.name, files)
                   }
+                  simplified={!advancedExperience}
                 />
               )}
-              {section === "versions" && (
+              {effectiveSection === "versions" && (
                 <KbIndexVersionsSection
                   kb={kb}
                   task={task}
@@ -253,7 +275,7 @@ export default function KnowledgeBaseDetail({
                   }
                 />
               )}
-              {section === "settings" && (
+              {effectiveSection === "settings" && (
                 <KbSettingsSection
                   kb={kb}
                   onSetDefault={() =>
@@ -262,6 +284,7 @@ export default function KnowledgeBaseDetail({
                   onDelete={() =>
                     kb.read_only ? Promise.resolve() : onDelete(kb.name)
                   }
+                  simplified={!advancedExperience}
                 />
               )}
             </div>

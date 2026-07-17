@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  normalizeExperienceMode,
+  type ExperienceMode,
+} from "@/lib/experience-mode";
+
 export type AppLanguage =
   | "en"
   | "zh"
@@ -10,6 +15,7 @@ export type AppLanguage =
 
 export const ACTIVE_SESSION_STORAGE_KEY = "deeptutor.activeSessionId.tab";
 export const LANGUAGE_STORAGE_KEY = "deeptutor-language";
+export const EXPERIENCE_MODE_STORAGE_KEY = "drona-experience-mode";
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = "deeptutor.sidebarCollapsed";
 export const CHAT_RESPONSE_TIMEOUT_STORAGE_KEY =
   "deeptutor.chatResponseTimeout";
@@ -57,6 +63,7 @@ export function writeStoredChatResponseTimeout(seconds: number): void {
 
 export const ACTIVE_SESSION_EVENT = "deeptutor:active-session";
 export const LANGUAGE_EVENT = "deeptutor:language";
+export const EXPERIENCE_MODE_EVENT = "drona:experience-mode";
 export const SIDEBAR_COLLAPSED_EVENT = "deeptutor:sidebar-collapsed";
 
 export function normalizeLanguage(
@@ -85,6 +92,31 @@ export function writeStoredLanguage(language: AppLanguage): void {
     window.dispatchEvent(
       new CustomEvent(LANGUAGE_EVENT, {
         detail: { language },
+      }),
+    );
+  } catch {
+    // localStorage may be unavailable
+  }
+}
+
+export function readStoredExperienceMode(): ExperienceMode {
+  if (typeof window === "undefined") return "student";
+  try {
+    return normalizeExperienceMode(
+      window.localStorage.getItem(EXPERIENCE_MODE_STORAGE_KEY),
+    );
+  } catch {
+    return "student";
+  }
+}
+
+export function writeStoredExperienceMode(mode: ExperienceMode): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(EXPERIENCE_MODE_STORAGE_KEY, mode);
+    window.dispatchEvent(
+      new CustomEvent(EXPERIENCE_MODE_EVENT, {
+        detail: { mode },
       }),
     );
   } catch {

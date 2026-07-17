@@ -26,6 +26,7 @@ interface KbDocumentsSectionProps {
   onClearHistory: () => void;
   onRetry?: () => Promise<void>;
   onUpload: (files: File[]) => Promise<void>;
+  simplified?: boolean;
 }
 
 /**
@@ -42,6 +43,7 @@ export default function KbDocumentsSection({
   onClearHistory,
   onRetry,
   onUpload,
+  simplified = false,
 }: KbDocumentsSectionProps) {
   const { t } = useTranslation();
   const [files, setFiles] = useState<File[]>([]);
@@ -127,12 +129,16 @@ export default function KbDocumentsSection({
     <div className="space-y-5">
       <div>
         <div className="text-[13px] font-medium text-[var(--foreground)]">
-          {t("Add documents")}
+          {simplified ? t("Add more material") : t("Add documents")}
         </div>
         <p className="mt-0.5 text-[11.5px] text-[var(--muted-foreground)]">
-          {t(
-            "Drop files here to add them to this knowledge base. New files are indexed against the active embedding model.",
-          )}
+          {simplified
+            ? t(
+                "Choose notes, handouts, or books that Drona should use when helping you.",
+              )
+            : t(
+                "Drop files here to add them to this knowledge base. New files are indexed against the active embedding model.",
+              )}
         </p>
       </div>
 
@@ -174,6 +180,8 @@ export default function KbDocumentsSection({
         onChange={setFiles}
         uploadPolicy={uploadPolicy}
         disabled={!canUpload || isUploadingHere}
+        allowFolderSelection={!simplified}
+        hidePolicyHint={simplified}
       />
 
       <div className="flex items-center justify-end">
@@ -192,7 +200,43 @@ export default function KbDocumentsSection({
         </button>
       </div>
 
-      {showTaskLogs &&
+      {simplified &&
+        showTaskLogs &&
+        task &&
+        (task.taskId || task.logs.length > 0 || task.executing) && (
+          <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+            <div className="flex items-center justify-between text-[12px] text-[var(--muted-foreground)]">
+              <span>
+                {task.executing
+                  ? t("Preparing your materials…")
+                  : task.error
+                    ? t("We could not prepare these materials.")
+                    : t("Materials are ready.")}
+              </span>
+              {task.executing && percent > 0 && (
+                <span className="font-medium text-[var(--foreground)]">
+                  {percent}%
+                </span>
+              )}
+            </div>
+            {task.executing && (
+              <div className="h-1.5 overflow-hidden rounded-full bg-[var(--border)]/70">
+                <div
+                  className="h-full rounded-full bg-[var(--primary)] transition-all duration-300"
+                  style={{ width: `${Math.max(percent, 4)}%` }}
+                />
+              </div>
+            )}
+            {task.error && (
+              <p className="text-[11.5px] text-red-700 dark:text-red-300">
+                {t("Try again, or ask a teacher or administrator for help.")}
+              </p>
+            )}
+          </div>
+        )}
+
+      {!simplified &&
+        showTaskLogs &&
         task &&
         (task.taskId || task.logs.length > 0 || task.executing) && (
           <div className="space-y-2">
@@ -230,7 +274,9 @@ export default function KbDocumentsSection({
           </div>
         )}
 
-      <KbUpdateHistory entries={history} onClear={onClearHistory} />
+      {!simplified && (
+        <KbUpdateHistory entries={history} onClear={onClearHistory} />
+      )}
     </div>
   );
 }

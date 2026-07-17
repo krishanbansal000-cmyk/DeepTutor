@@ -12,17 +12,13 @@ import {
 import { useTranslation } from "react-i18next";
 import { SPACE_ITEMS } from "@/lib/space-items";
 import { setPickerOrigin } from "@/lib/picker-origin";
+import { useAppShell } from "@/context/AppShellContext";
+import {
+  chatSpaceItemVisible,
+  type ChatSpaceItemKey,
+} from "@/lib/experience-mode";
 
-type SelectableSpaceKey =
-  | "attach"
-  | "knowledge"
-  | "chat_history"
-  | "my_agents"
-  | "books"
-  | "notebooks"
-  | "question_bank"
-  | "persona"
-  | "memory";
+type SelectableSpaceKey = ChatSpaceItemKey;
 
 export interface ChatSpaceSelectionCounts {
   attachments: number;
@@ -102,12 +98,14 @@ export default memo(function ChatSpaceMenu({
   onSelectItem,
 }: ChatSpaceMenuProps) {
   const { t } = useTranslation();
+  const { experienceMode } = useAppShell();
   const compact = variant === "toolbar";
   const isMention = variant === "mention";
 
   // Render the items in a fixed, hand-tuned order so the menu always reads
   // the same regardless of how SPACE_ITEMS may be reordered for navigation.
   const items = ITEM_ORDER.filter((key) => {
+    if (!chatSpaceItemVisible(experienceMode, key)) return false;
     if (key === "knowledge") return knowledgeAvailable;
     if (key === "persona") return personaAvailable;
     if (key === "my_agents") return agentsAvailable;

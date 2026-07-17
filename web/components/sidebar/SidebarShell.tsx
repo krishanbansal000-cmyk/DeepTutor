@@ -30,6 +30,12 @@ import type { SessionSummary } from "@/lib/session-api";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useCapabilityAccess } from "@/components/access/CapabilityAccessContext";
 import type { Capability } from "@/lib/capability-routes";
+import {
+  isAdvancedExperience,
+  knowledgeLabel,
+  primaryNavVisible,
+  secondaryNavVisible,
+} from "@/lib/experience-mode";
 
 interface NavEntry {
   href: string;
@@ -145,8 +151,20 @@ export function SidebarShell({
   const router = useRouter();
   const { t } = useTranslation();
   const { has } = useCapabilityAccess();
-  const { sidebarCollapsed: collapsed, setSidebarCollapsed: setCollapsed } =
-    useAppShell();
+  const {
+    sidebarCollapsed: collapsed,
+    setSidebarCollapsed: setCollapsed,
+    experienceMode,
+  } = useAppShell();
+
+  const visiblePrimaryNav = PRIMARY_NAV.filter((item) =>
+    primaryNavVisible(experienceMode, item.href),
+  );
+  const visibleSecondaryNav = SECONDARY_NAV.filter((item) =>
+    secondaryNavVisible(experienceMode, item.href),
+  );
+  const labelFor = (item: NavEntry) =>
+    item.href === "/knowledge" ? knowledgeLabel(experienceMode) : item.label;
 
   const navLocked = (item: NavEntry) =>
     item.requires ? !has(item.requires) : false;
@@ -215,7 +233,7 @@ export function SidebarShell({
 
         {/* Primary nav */}
         <nav className="mt-1 flex w-full flex-col items-center gap-1 px-1.5">
-          {PRIMARY_NAV.map((item) => {
+          {visiblePrimaryNav.map((item) => {
             const active = pathname.startsWith(item.href);
             const locked = navLocked(item);
             const description = locked
@@ -227,12 +245,12 @@ export function SidebarShell({
               return (
                 <Tooltip
                   key={item.href}
-                  label={t(item.label)}
+                  label={t(labelFor(item))}
                   description={description}
                   side="right"
                 >
                   <div
-                    aria-label={`${t(item.label)} — ${lockedTooltip}`}
+                    aria-label={`${t(labelFor(item))} — ${lockedTooltip}`}
                     aria-disabled
                     className="relative flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-xl text-[var(--muted-foreground)]/40"
                   >
@@ -249,14 +267,14 @@ export function SidebarShell({
             return (
               <Tooltip
                 key={item.href}
-                label={t(item.label)}
+                label={t(labelFor(item))}
                 description={description}
                 side="right"
               >
                 <Link
                   href={item.href}
                   onClick={item.href === "/home" ? handleHomeClick : undefined}
-                  aria-label={t(item.label)}
+                  aria-label={t(labelFor(item))}
                   className={`relative flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-150 ${
                     active
                       ? "bg-[var(--accent)] text-[var(--foreground)] shadow-sm"
@@ -275,13 +293,13 @@ export function SidebarShell({
         {/* Secondary nav + footer */}
         <div className="flex w-full flex-col items-center gap-1 px-1.5">
           <div className="my-1 h-px w-7 bg-[var(--border)]/40" />
-          {SECONDARY_NAV.map((item) => {
+          {visibleSecondaryNav.map((item) => {
             const active = pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                title={t(item.label) as string}
+                title={t(labelFor(item)) as string}
                 className={`relative flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-150 ${
                   active
                     ? "bg-[var(--accent)] text-[var(--foreground)] shadow-sm"
@@ -303,7 +321,7 @@ export function SidebarShell({
           >
             <BookText size={15} strokeWidth={1.6} />
           </a>
-          <a
+          {isAdvancedExperience(experienceMode) && <a
             href={GITHUB_REPO_URL}
             target="_blank"
             rel="noreferrer noopener"
@@ -312,7 +330,7 @@ export function SidebarShell({
             className="flex h-9 w-9 items-center justify-center rounded-xl text-[var(--muted-foreground)]/70 transition-colors hover:bg-[var(--background)]/50 hover:text-[var(--foreground)]"
           >
             <Github size={15} strokeWidth={1.6} />
-          </a>
+          </a>}
           <VersionBadge collapsed />
         </div>
       </aside>
@@ -348,24 +366,24 @@ export function SidebarShell({
       {/* Primary nav */}
       <nav className="px-2 pt-1">
         <div className="space-y-px">
-          {PRIMARY_NAV.map((item) => {
+          {visiblePrimaryNav.map((item) => {
             const active = pathname.startsWith(item.href);
             const locked = navLocked(item);
             if (locked) {
               return (
                 <Tooltip
                   key={item.href}
-                  label={t(item.label)}
+                  label={t(labelFor(item))}
                   description={lockedTooltip}
                   side="right"
                 >
                   <div
-                    aria-label={`${t(item.label)} — ${lockedTooltip}`}
+                    aria-label={`${t(labelFor(item))} — ${lockedTooltip}`}
                     aria-disabled
                     className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] text-[var(--muted-foreground)]/40"
                   >
                     <item.icon size={16} strokeWidth={1.5} />
-                    <span>{t(item.label)}</span>
+                    <span>{t(labelFor(item))}</span>
                     <Lock size={13} strokeWidth={1.8} className="ml-auto" />
                   </div>
                 </Tooltip>
@@ -383,7 +401,7 @@ export function SidebarShell({
                 }`}
               >
                 <item.icon size={16} strokeWidth={active ? 1.9 : 1.5} />
-                <span>{t(item.label)}</span>
+                <span>{t(labelFor(item))}</span>
               </Link>
             );
           })}
@@ -444,7 +462,7 @@ export function SidebarShell({
 
       {/* Secondary nav + footer */}
       <div className="border-t border-[var(--border)]/40 px-2 py-2">
-        {SECONDARY_NAV.map((item) => {
+        {visibleSecondaryNav.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
             <Link
@@ -457,7 +475,7 @@ export function SidebarShell({
               }`}
             >
               <item.icon size={16} strokeWidth={active ? 1.9 : 1.5} />
-              <span>{t(item.label)}</span>
+              <span>{t(labelFor(item))}</span>
             </Link>
           );
         })}
@@ -474,7 +492,7 @@ export function SidebarShell({
           >
             <BookText size={13} strokeWidth={1.7} />
           </a>
-          <a
+          {isAdvancedExperience(experienceMode) && <a
             href={GITHUB_REPO_URL}
             target="_blank"
             rel="noreferrer noopener"
@@ -483,7 +501,7 @@ export function SidebarShell({
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--muted-foreground)]/55 transition-colors hover:bg-[var(--background)]/50 hover:text-[var(--muted-foreground)]"
           >
             <Github size={13} strokeWidth={1.7} />
-          </a>
+          </a>}
         </div>
       </div>
     </aside>

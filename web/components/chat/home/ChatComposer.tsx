@@ -45,6 +45,8 @@ import type { LLMOption } from "@/lib/llm-options";
 import ChatSpaceMenu from "@/components/chat/space/ChatSpaceMenu";
 import type { SpaceMemoryFile } from "@/lib/space-items";
 import type { SelectedBookReference } from "@/lib/book-references";
+import { useAppShell } from "@/context/AppShellContext";
+import { isAdvancedExperience } from "@/lib/experience-mode";
 import AgentSelector from "./AgentSelector";
 import KnowledgeSelector from "./KnowledgeSelector";
 import ModelSelector from "./ModelSelector";
@@ -321,6 +323,8 @@ export default memo(function ChatComposer({
   inputPlaceholder?: string;
 }) {
   const { t } = useTranslation();
+  const { experienceMode } = useAppShell();
+  const advancedExperience = isAdvancedExperience(experienceMode);
   const CapIcon = activeCap.icon;
 
   const [hasContent, setHasContent] = useState(false);
@@ -935,7 +939,9 @@ export default memo(function ChatComposer({
               </div>
 
               <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                {connectedAgents.length > 0 && onSelectAgent ? (
+                {advancedExperience &&
+                connectedAgents.length > 0 &&
+                onSelectAgent ? (
                   <AgentSelector
                     agents={connectedAgents}
                     selected={selectedAgent}
@@ -951,7 +957,7 @@ export default memo(function ChatComposer({
                     onToggle={onToggleKB}
                   />
                 ) : null}
-                {onPersonaSelectionChange ? (
+                {advancedExperience && onPersonaSelectionChange ? (
                   <PersonaSelector
                     value={personaSelection ?? ""}
                     onChange={onPersonaSelectionChange}
@@ -959,14 +965,16 @@ export default memo(function ChatComposer({
                     onOpenChange={onPersonaSelectorOpenChange}
                   />
                 ) : null}
-                <ModelSelector
-                  options={llmOptions}
-                  activeDefault={activeLLMDefault}
-                  value={llmSelection}
-                  loading={llmOptionsLoading}
-                  error={llmOptionsError}
-                  onChange={onSelectLLM}
-                />
+                {advancedExperience && (
+                  <ModelSelector
+                    options={llmOptions}
+                    activeDefault={activeLLMDefault}
+                    value={llmSelection}
+                    loading={llmOptionsLoading}
+                    error={llmOptionsError}
+                    onChange={onSelectLLM}
+                  />
+                )}
 
                 <button
                   type="button"

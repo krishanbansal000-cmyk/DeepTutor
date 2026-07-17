@@ -11,12 +11,14 @@ interface KbSettingsSectionProps {
   kb: KnowledgeBase;
   onSetDefault: () => Promise<void>;
   onDelete: () => Promise<void>;
+  simplified?: boolean;
 }
 
 export default function KbSettingsSection({
   kb,
   onSetDefault,
   onDelete,
+  simplified = false,
 }: KbSettingsSectionProps) {
   const { t } = useTranslation();
   const meta = kb.metadata || {};
@@ -35,20 +37,28 @@ export default function KbSettingsSection({
       <section className="space-y-3">
         <div>
           <div className="text-[13px] font-medium text-[var(--foreground)]">
-            {t("Overview")}
+            {simplified ? t("Details") : t("Overview")}
           </div>
           <p className="mt-0.5 text-[11.5px] text-[var(--muted-foreground)]">
-            {t("Read-only metadata. Use the actions below to manage this KB.")}
+            {simplified
+              ? t("Manage how this material collection is used in chat.")
+              : t(
+                  "Read-only metadata. Use the actions below to manage this KB.",
+                )}
           </p>
         </div>
 
         <dl className="grid gap-3 rounded-lg border border-[var(--border)] bg-[var(--background)] p-3 sm:grid-cols-2">
-          <Field label={t("RAG provider")}>{provider}</Field>
-          <Field label={t("Embedding")}>{embeddingLabel}</Field>
+          {!simplified && (
+            <Field label={t("RAG provider")}>{provider}</Field>
+          )}
+          {!simplified && (
+            <Field label={t("Embedding")}>{embeddingLabel}</Field>
+          )}
           <Field label={t("Created")}>{created || "—"}</Field>
           <Field label={t("Updated")}>{updated || "—"}</Field>
           <Field label={t("Last indexed")}>{lastIndexed || "—"}</Field>
-          {kb.path && (
+          {!simplified && kb.path && (
             <Field label={t("On-disk path")} className="sm:col-span-2">
               <span className="font-mono text-[10.5px] text-[var(--muted-foreground)]">
                 {kb.path}
@@ -64,7 +74,11 @@ export default function KbSettingsSection({
             {t("Default knowledge base")}
           </div>
           <p className="mt-0.5 text-[11.5px] text-[var(--muted-foreground)]">
-            {t("The default KB is selected automatically in chat & partners.")}
+            {simplified
+              ? t("The default collection is selected automatically in chat.")
+              : t(
+                  "The default KB is selected automatically in chat & partners.",
+                )}
           </p>
         </div>
         {kb.is_default ? (
@@ -90,9 +104,13 @@ export default function KbSettingsSection({
             {t("Danger zone")}
           </div>
           <p className="mt-0.5 text-[11.5px] text-red-700/80 dark:text-red-300/80">
-            {t(
-              "Deleting a knowledge base permanently removes its raw documents and index versions.",
-            )}
+            {simplified
+              ? t(
+                  "Deleting this collection permanently removes its uploaded materials.",
+                )
+              : t(
+                  "Deleting a knowledge base permanently removes its raw documents and index versions.",
+                )}
           </p>
         </div>
         <button
@@ -101,7 +119,7 @@ export default function KbSettingsSection({
           className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2.5 py-1 text-[12px] font-medium text-red-700 transition-colors hover:bg-red-100 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50"
         >
           <Trash2 className="h-3 w-3" />
-          {t("Delete knowledge base")}
+          {simplified ? t("Delete collection") : t("Delete knowledge base")}
         </button>
       </section>
     </div>

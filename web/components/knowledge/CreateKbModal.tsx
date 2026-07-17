@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
@@ -22,6 +22,8 @@ import {
   type RagProviderSummary,
 } from "@/lib/knowledge-api";
 import { validateFiles } from "@/lib/knowledge-helpers";
+import { useAppShell } from "@/context/AppShellContext";
+import { isAdvancedExperience } from "@/lib/experience-mode";
 import FileDropZone from "./FileDropZone";
 
 const PAGEINDEX_FORMATS = [".pdf", ".md", ".markdown"];
@@ -83,6 +85,8 @@ export default function CreateKbModal({
   initialSource,
 }: CreateKbModalProps) {
   const { t } = useTranslation();
+  const { experienceMode } = useAppShell();
+  const advancedExperience = isAdvancedExperience(experienceMode);
   const [mode, setMode] = useState<Mode>("new");
   const [name, setName] = useState("");
   const [provider, setProvider] = useState("llamaindex");
@@ -104,14 +108,34 @@ export default function CreateKbModal({
   const [error, setError] = useState<string | null>(null);
 
   const firstLinkable = providers.find((p) => p.linkable)?.id;
+  const defaultUploadProvider = useMemo(
+    () =>
+      providers.find(
+        (candidate) =>
+          candidate.id === "llamaindex" && candidate.configured !== false,
+      )?.id ??
+      providers.find(
+        (candidate) =>
+          candidate.id !== LIGHTRAG_SERVER_PROVIDER &&
+          candidate.configured !== false,
+      )?.id ??
+      providers.find((candidate) => candidate.id !== LIGHTRAG_SERVER_PROVIDER)
+        ?.id ??
+      "llamaindex",
+    [providers],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
-    setMode(initialMode);
+    setMode(advancedExperience ? initialMode : "new");
     setName("");
     setFiles([]);
     setError(null);
-    setProvider(initialSource || providers[0]?.id || "llamaindex");
+    setProvider(
+      advancedExperience && initialSource
+        ? initialSource
+        : defaultUploadProvider,
+    );
     setLinkSource(initialSource || firstLinkable || OBSIDIAN_SOURCE);
     setFolderPath("");
     setProbe(null);
@@ -121,7 +145,14 @@ export default function CreateKbModal({
     setServerMode("");
     setServerProbe(null);
     setServerProbing(false);
-  }, [isOpen, providers, firstLinkable, initialMode, initialSource]);
+  }, [
+    advancedExperience,
+    defaultUploadProvider,
+    firstLinkable,
+    initialMode,
+    initialSource,
+    isOpen,
+  ]);
 
   // A fresh path / source invalidates a stale probe verdict.
   useEffect(() => {
@@ -164,6 +195,13 @@ export default function CreateKbModal({
   const canSubmit = (() => {
     if (submitting) return false;
     if (!trimmed) return false;
+    if (!advancedExperience) {
+      return (
+        !providerUnavailable &&
+        !isLightRagServer &&
+        selection.validFiles.length > 0
+      );
+    }
     if (mode === "new") {
       if (isLightRagServer) {
         // The connection must pass the test before a KB is bound to it.
@@ -216,7 +254,13 @@ export default function CreateKbModal({
     setSubmitting(true);
     setError(null);
     try {
-      if (mode === "new") {
+      if (!advancedExperience) {
+        await onCreate({
+          name: trimmed,
+          provider,
+          files: selection.validFiles,
+        });
+      } else if (mode === "new") {
         if (isLightRagServer) {
           await onConnectLightRagServer({
             name: trimmed,
@@ -249,7 +293,9 @@ export default function CreateKbModal({
   };
 
   const submitLabel =
-    mode === "new"
+    !advancedExperience
+      ? t("Add materials")
+      : mode === "new"
       ? isLightRagServer
         ? t("Connect")
         : t("Create")
@@ -261,7 +307,13 @@ export default function CreateKbModal({
     <Modal
       isOpen={isOpen}
       onClose={submitting ? () => {} : onClose}
-      title={t("Create knowledge base")}
+      title={
+        experienceMode === "student"
+          ? t("Add study materials")
+          : experienceMode === "teacher"
+            ? t("Create course library")
+            : t("Create knowledge base")
+      }
       titleIcon={<Plus size={16} />}
       width="lg"
       closeOnBackdrop={!submitting}
@@ -284,7 +336,8 @@ export default function CreateKbModal({
           >
             {submitting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : mode === "new" && !isLightRagServer ? (
+            ) : !advancedExperience ||
+              (mode === "new" && !isLightRagServer) ? (
               <Plus size={14} />
             ) : (
               <Link2 size={14} />
@@ -295,29 +348,62 @@ export default function CreateKbModal({
       }
     >
       <div className="space-y-4 px-5 py-4">
-        {/* New vs. link existing */}
-        <ModeToggle
-          mode={mode}
-          onChange={setMode}
-          disabled={submitting}
-          t={t}
-        />
+        {/* Linking existing indexes is an infrastructure operation. */}
+        {advancedExperience && (
+          <ModeToggle
+            mode={mode}
+            onChange={setMode}
+            disabled={submitting}
+            t={t}
+          />
+        )}
 
         <div>
           <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
-            {t("Knowledge base name")}
+            {advancedExperience
+              ? t("Knowledge base name")
+              : experienceMode === "student"
+                ? t("Material collection name")
+                : t("Course library name")}
           </label>
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
             autoFocus
             disabled={submitting}
-            placeholder={t("e.g. project-papers")}
+            placeholder={
+              advancedExperience
+                ? t("e.g. project-papers")
+                : experienceMode === "student"
+                  ? t("e.g. Semester 1 notes")
+                  : t("e.g. BCA Semester 1")
+            }
             className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[13px] text-[var(--foreground)] outline-none transition-colors focus:border-[var(--foreground)]/25 disabled:opacity-50"
           />
         </div>
 
-        {mode === "new" ? (
+        {!advancedExperience ? (
+          <div>
+            <label className="mb-2 block text-[11px] font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
+              {t("Files")}
+            </label>
+            <FileDropZone
+              files={files}
+              onChange={setFiles}
+              uploadPolicy={policyForProvider}
+              disabled={submitting || providerUnavailable}
+              allowFolderSelection={false}
+              hidePolicyHint
+            />
+            {providerUnavailable && (
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                {t(
+                  "Material uploads are not configured yet. Ask your teacher or administrator for help.",
+                )}
+              </p>
+            )}
+          </div>
+        ) : mode === "new" ? (
           <NewModeFields
             providers={providers}
             provider={provider}
@@ -368,9 +454,13 @@ export default function CreateKbModal({
 
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-            <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">
-              {error}
-            </pre>
+            {advancedExperience ? (
+              <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">
+                {error}
+              </pre>
+            ) : (
+              <p>{error}</p>
+            )}
           </div>
         )}
       </div>

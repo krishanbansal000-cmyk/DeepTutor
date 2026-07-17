@@ -525,6 +525,27 @@ async def test_apply_catalog_invalidates_runtime_caches(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
+async def test_experience_mode_defaults_and_roundtrips(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    settings_file = tmp_path / "interface.json"
+    monkeypatch.setattr(settings_router, "_settings_file", lambda: settings_file)
+
+    assert settings_router.load_ui_settings()["experience_mode"] == "student"
+
+    response = await settings_router.update_ui_settings(
+        settings_router.UISettings(experience_mode="teacher")
+    )
+    assert response["experience_mode"] == "teacher"
+    assert settings_router.load_ui_settings()["experience_mode"] == "teacher"
+
+    response = await settings_router.update_ui_settings(
+        settings_router.UISettings(experience_mode="advanced")
+    )
+    assert response["experience_mode"] == "advanced"
+
+
+@pytest.mark.asyncio
 async def test_enabled_tools_roundtrip(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     settings_file = tmp_path / "interface.json"
     monkeypatch.setattr(settings_router, "_settings_file", lambda: settings_file)

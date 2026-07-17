@@ -58,6 +58,9 @@ DEFAULT_UI_SETTINGS = {
     # "snow" is the beige paper theme, shown as "Default" in the UI.
     "theme": "snow",
     "language": "en",
+    # Student-first presentation preset. Teacher adds course-authoring surfaces;
+    # Advanced restores every original DeepTutor console and control.
+    "experience_mode": "student",
     "sidebar_description": "✨ Data Intelligence Lab @ HKU",
     "sidebar_nav_order": DEFAULT_SIDEBAR_NAV_ORDER,
     # User-toggleable chat tools. Default = all on; the /settings/tools page
@@ -89,6 +92,7 @@ class SidebarNavOrder(BaseModel):
 class UISettings(BaseModel):
     theme: Literal["light", "dark", "glass", "snow"] = "snow"
     language: Literal["en", "hi", "bundeli", "awadhi", "bhojpuri"] = "en"
+    experience_mode: Literal["student", "teacher", "advanced"] = "student"
     sidebar_description: Optional[str] = None
     sidebar_nav_order: Optional[SidebarNavOrder] = None
 

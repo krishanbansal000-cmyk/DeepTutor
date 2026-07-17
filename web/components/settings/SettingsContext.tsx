@@ -13,8 +13,15 @@ import {
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 
-import { writeStoredLanguage } from "@/context/app-shell-storage";
+import {
+  writeStoredExperienceMode,
+  writeStoredLanguage,
+} from "@/context/app-shell-storage";
 import { apiFetch, apiUrl } from "@/lib/api";
+import {
+  normalizeExperienceMode,
+  type ExperienceMode,
+} from "@/lib/experience-mode";
 import { setTheme as applyThemePreference } from "@/lib/theme";
 
 // ─── Domain types ─────────────────────────────────────────────────────────
@@ -100,6 +107,7 @@ export type Catalog = {
 export type UiSettings = {
   theme: "light" | "dark" | "glass" | "snow";
   language: "en" | "zh" | "hi" | "bundeli" | "awadhi" | "bhojpuri";
+  experience_mode: ExperienceMode;
 };
 
 export type ProviderOption = {
@@ -391,12 +399,14 @@ type SettingsContextValue = {
   hasUnsavedChanges: boolean;
   theme: UiSettings["theme"];
   language: UiSettings["language"];
+  experienceMode: ExperienceMode;
   toast: string;
   setToast: (value: string) => void;
 
   // UI prefs
   updateTheme: (next: UiSettings["theme"]) => Promise<void>;
   updateLanguage: (next: UiSettings["language"]) => Promise<void>;
+  updateExperienceMode: (next: ExperienceMode) => Promise<void>;
 
   // Catalog mutation
   mutateCatalog: (mutator: (next: Catalog) => void) => void;
@@ -472,6 +482,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [theme, setTheme] = useState<UiSettings["theme"]>("snow");
   const [language, setLanguage] = useState<UiSettings["language"]>("en");
+  const [experienceMode, setExperienceMode] =
+    useState<ExperienceMode>("student");
   const [catalog, setCatalog] = useState<Catalog>(defaultCatalog());
   const [draft, setDraft] = useState<Catalog>(defaultCatalog());
   const [catalogEditable, setCatalogEditable] = useState<boolean | null>(null);
@@ -555,6 +567,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       }
       setTheme(payload.ui.theme);
       setLanguage(payload.ui.language);
+      const nextExperienceMode = normalizeExperienceMode(
+        payload.ui.experience_mode,
+      );
+      setExperienceMode(nextExperienceMode);
+      writeStoredExperienceMode(nextExperienceMode);
       if (payload.providers) setProviders(payload.providers);
       settingsLoaded = true;
     } catch (err) {
@@ -619,11 +636,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     async (
       nextTheme: UiSettings["theme"],
       nextLanguage: UiSettings["language"],
+      nextExperienceMode: ExperienceMode,
     ) => {
       await apiFetch(apiUrl("/api/v1/settings/ui"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ theme: nextTheme, language: nextLanguage }),
+        body: JSON.stringify({
+          theme: nextTheme,
+          language: nextLanguage,
+          experience_mode: nextExperienceMode,
+        }),
       });
     },
     [],
@@ -633,18 +655,27 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     async (next: UiSettings["theme"]) => {
       setTheme(next);
       applyThemePreference(next);
-      await persistUi(next, language);
+      await persistUi(next, language, experienceMode);
     },
-    [language, persistUi],
+    [experienceMode, language, persistUi],
   );
 
   const updateLanguage = useCallback(
     async (next: UiSettings["language"]) => {
       setLanguage(next);
       writeStoredLanguage(next);
-      await persistUi(theme, next);
+      await persistUi(theme, next, experienceMode);
     },
-    [persistUi, theme],
+    [experienceMode, persistUi, theme],
+  );
+
+  const updateExperienceMode = useCallback(
+    async (next: ExperienceMode) => {
+      setExperienceMode(next);
+      writeStoredExperienceMode(next);
+      await persistUi(theme, language, next);
+    },
+    [language, persistUi, theme],
   );
 
   // ── Catalog mutators ────────────────────────────────────────────────────
@@ -1167,10 +1198,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       hasUnsavedChanges,
       theme,
       language,
+      experienceMode,
       toast,
       setToast,
       updateTheme,
       updateLanguage,
+      updateExperienceMode,
       mutateCatalog,
       addProfile,
       removeActiveProfile,
@@ -1211,6 +1244,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       draft,
       embeddingCapabilities,
       embeddingDefaultDim,
+      experienceMode,
       hasUnsavedChanges,
       language,
       llmContextDetection,
@@ -1236,6 +1270,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       toast,
       tourStepIndex,
       updateContextWindowField,
+      updateExperienceMode,
       updateLanguage,
       updateModelBoolField,
       updateModelField,

@@ -1,11 +1,14 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 import SettingsBreadcrumb from "@/components/settings/SettingsBreadcrumb";
+import { useSettings } from "@/components/settings/SettingsContext";
 import { SettingsToolbar } from "@/components/settings/SettingsToolbar";
 import { SettingsLoadStatusBanner } from "@/components/settings/SettingsLoadStatusBanner";
 import { SETTINGS_HUB_HREF, isNavOnlyRoute } from "@/lib/settings-nav";
+import { isAdvancedExperience } from "@/lib/experience-mode";
 
 // Two-level hub: the dashboard at `/settings` is the entry; categories with
 // several settings open a sub-hub, the rest go straight to a leaf. Every page
@@ -17,7 +20,27 @@ export default function SettingsMain({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname() ?? "";
+  const router = useRouter();
+  const { experienceMode, settingsLoading } = useSettings();
+  const advanced = isAdvancedExperience(experienceMode);
   const isHub = pathname === SETTINGS_HUB_HREF;
+  const restricted =
+    !settingsLoading &&
+    !advanced &&
+    pathname !== SETTINGS_HUB_HREF &&
+    pathname !== "/settings/appearance";
+
+  useEffect(() => {
+    if (restricted) router.replace("/settings/appearance");
+  }, [restricted, router]);
+
+  if (restricted) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[var(--background)] text-[13px] text-[var(--muted-foreground)]">
+        Opening experience settings…
+      </div>
+    );
+  }
 
   if (isHub) {
     return (
@@ -29,7 +52,7 @@ export default function SettingsMain({
     );
   }
 
-  const showToolbar = !isNavOnlyRoute(pathname);
+  const showToolbar = advanced && !isNavOnlyRoute(pathname);
 
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-[var(--background)]">

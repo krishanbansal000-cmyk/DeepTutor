@@ -109,6 +109,7 @@ import {
   selectedBooksToPayload,
   type SelectedBookReference,
 } from "@/lib/book-references";
+import { capabilityVisible } from "@/lib/experience-mode";
 
 const NotebookRecordPicker = dynamic(
   () => import("@/components/notebook/NotebookRecordPicker"),
@@ -317,7 +318,11 @@ export default function ChatPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const sessionIdParam = params.sessionId?.[0] ?? null;
-  const { setActiveSessionId, language: appLanguage } = useAppShell();
+  const {
+    setActiveSessionId,
+    language: appLanguage,
+    experienceMode,
+  } = useAppShell();
 
   const {
     state,
@@ -564,6 +569,24 @@ export default function ChatPage() {
     () => getCapability(state.activeCapability),
     [state.activeCapability],
   );
+  const availableCapabilities = useMemo(
+    () =>
+      CAPABILITIES.filter((capability) =>
+        capabilityVisible(experienceMode, capability.value),
+      ),
+    [experienceMode],
+  );
+
+  // Sessions remember their last capability. If the user changes to a
+  // simpler experience, return the session to normal chat instead of leaving
+  // a hidden advanced capability active in the background.
+  useEffect(() => {
+    if (
+      !capabilityVisible(experienceMode, state.activeCapability || "")
+    ) {
+      setCapability(null);
+    }
+  }, [experienceMode, setCapability, state.activeCapability]);
   const isQuizMode = activeCap.value === "deep_question";
   const isVisualizeMode = activeCap.value === "visualize";
   const isResearchMode = activeCap.value === "deep_research";
@@ -1102,7 +1125,9 @@ export default function ChatPage() {
   const handleSelectCapability = useCallback(
     (value: string) => {
       const cap =
-        CAPABILITIES.find((c) => c.value === value) ?? CAPABILITIES[0];
+        availableCapabilities.find((c) => c.value === value) ??
+        availableCapabilities[0] ??
+        CAPABILITIES[0];
       const storageKey = cap.value || "chat";
       const config = resolveCapabilityPlaygroundConfig(
         capabilityConfigs,
@@ -1128,7 +1153,14 @@ export default function ChatPage() {
       setCapabilityConfigConfirmed(false);
       setCapMenuOpen(false);
     },
-    [capabilityConfigs, setCapability, setKBs, setTools, userEnabledTools],
+    [
+      availableCapabilities,
+      capabilityConfigs,
+      setCapability,
+      setKBs,
+      setTools,
+      userEnabledTools,
+    ],
   );
 
   const fileToAttachment = useCallback(
@@ -1957,7 +1989,7 @@ export default function ChatPage() {
               capabilityNeedsConfig={capabilityNeedsConfig}
               capabilityConfigConfirmed={capabilityConfigConfirmed}
               onRequestConfigConfirm={ensureActivityPanelOpen}
-              capabilities={CAPABILITIES}
+              capabilities={availableCapabilities}
               onSetCapMenuOpen={setCapMenuOpen}
               onSetSpaceMenuOpen={setSpaceMenuOpen}
               onToggleKB={handleToggleKB}

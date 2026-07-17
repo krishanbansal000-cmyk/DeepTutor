@@ -12,7 +12,12 @@ import {
 
 export default function AppearanceSettingsPage() {
   const { t } = useTranslation();
-  const { theme, language, updateTheme, updateLanguage } = useSettings();
+  const {
+    theme,
+    language,
+    updateTheme,
+    updateLanguage,
+  } = useSettings();
 
   return (
     <div data-tour="tour-appearance">

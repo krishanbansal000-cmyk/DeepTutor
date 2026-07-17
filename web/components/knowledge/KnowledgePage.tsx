@@ -11,13 +11,17 @@ import KnowledgeHome from "./KnowledgeHome";
 import EngineDetail from "./EngineDetail";
 import CreateKbModal from "./CreateKbModal";
 import PageIndexSettingsModal from "./PageIndexSettingsModal";
+import { useAppShell } from "@/context/AppShellContext";
+import { isAdvancedExperience } from "@/lib/experience-mode";
 
 export default function KnowledgePage() {
   const { t } = useTranslation();
+  const { experienceMode } = useAppShell();
+  const advancedExperience = isAdvancedExperience(experienceMode);
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialKb = searchParams.get("kb");
-  const initialEngine = searchParams.get("engine");
+  const initialEngine = advancedExperience ? searchParams.get("engine") : null;
 
   const {
     kbs: allKbs,
@@ -256,8 +260,9 @@ export default function KnowledgePage() {
               onOpenEngine={openEngine}
               onCreate={openCreate}
               onConnectObsidian={openObsidian}
+              experienceMode={experienceMode}
             />
-          ) : view === "engine" && selectedProvider ? (
+          ) : advancedExperience && view === "engine" && selectedProvider ? (
             <EngineDetail
               provider={selectedProvider}
               kbs={kbs}
@@ -276,6 +281,7 @@ export default function KnowledgePage() {
               onOpenEngine={openEngine}
               onCreate={openCreate}
               onConnectObsidian={openObsidian}
+              experienceMode={experienceMode}
             />
           ) : (
             <KnowledgeBaseDetail
@@ -313,11 +319,13 @@ export default function KnowledgePage() {
         }}
       />
 
-      <PageIndexSettingsModal
-        isOpen={pipelineOpen}
-        onClose={() => setPipelineOpen(false)}
-        onSaved={() => void refresh({ force: true })}
-      />
+      {advancedExperience && (
+        <PageIndexSettingsModal
+          isOpen={pipelineOpen}
+          onClose={() => setPipelineOpen(false)}
+          onSaved={() => void refresh({ force: true })}
+        />
+      )}
     </div>
   );
 }

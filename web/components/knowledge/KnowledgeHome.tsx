@@ -27,6 +27,11 @@ import {
   type KnowledgeBase,
 } from "@/lib/knowledge-helpers";
 import type { RagProviderSummary } from "@/lib/knowledge-api";
+import {
+  isAdvancedExperience,
+  knowledgeLabel,
+  type ExperienceMode,
+} from "@/lib/experience-mode";
 
 interface KnowledgeHomeProps {
   kbs: KnowledgeBase[];
@@ -36,6 +41,7 @@ interface KnowledgeHomeProps {
   onCreate: () => void;
   /** Open the create flow pre-set to link an Obsidian vault. */
   onConnectObsidian: () => void;
+  experienceMode: ExperienceMode;
 }
 
 const ENGINE_ICONS: Record<string, LucideIcon> = {
@@ -101,8 +107,10 @@ export default function KnowledgeHome({
   onOpenEngine,
   onCreate,
   onConnectObsidian,
+  experienceMode,
 }: KnowledgeHomeProps) {
   const { t } = useTranslation();
+  const advancedExperience = isAdvancedExperience(experienceMode);
   const [query, setQuery] = useState("");
   const providerName = (id: string) =>
     providers.find((p) => p.id === id)?.name ??
@@ -132,10 +140,18 @@ export default function KnowledgeHome({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-[19px] font-semibold tracking-tight text-[var(--foreground)]">
-              {t("Knowledge Center")}
+              {t(knowledgeLabel(experienceMode))}
             </h1>
             <p className="mt-1 text-[12.5px] text-[var(--muted-foreground)]">
-              {t("Manage your knowledge bases and retrieval engines.")}
+              {advancedExperience
+                ? t("Manage your knowledge bases and retrieval engines.")
+                : experienceMode === "student"
+                  ? t(
+                      "Upload your notes, handouts, and books so Drona can use them while helping you.",
+                    )
+                  : t(
+                      "Organize course materials that Drona can use for grounded teaching support.",
+                    )}
             </p>
           </div>
           <button
@@ -144,12 +160,16 @@ export default function KnowledgeHome({
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-opacity hover:opacity-90"
           >
             <Plus size={14} />
-            {t("New knowledge base")}
+            {experienceMode === "student"
+              ? t("Add materials")
+              : experienceMode === "teacher"
+                ? t("New course library")
+                : t("New knowledge base")}
           </button>
         </div>
 
         {/* Retrieval engines */}
-        <section className="mt-8">
+        {advancedExperience && <section className="mt-8">
           <h2 className="mb-3 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
             <Cpu className="h-3.5 w-3.5" />
             {t("Retrieval engines")}
@@ -234,14 +254,18 @@ export default function KnowledgeHome({
               </div>
             </button>
           </div>
-        </section>
+        </section>}
 
         {/* Knowledge bases */}
         <section className="mt-8 pb-2">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
               <Database className="h-3.5 w-3.5" />
-              {t("Knowledge bases")}
+              {experienceMode === "student"
+                ? t("Study materials")
+                : experienceMode === "teacher"
+                  ? t("Course libraries")
+                  : t("Knowledge bases")}
               <span className="rounded-full bg-[var(--muted)] px-1.5 py-0.5 text-[10px] text-[var(--muted-foreground)]">
                 {kbs.length}
               </span>
@@ -266,12 +290,20 @@ export default function KnowledgeHome({
             <div className="rounded-2xl border border-dashed border-[var(--border)] px-4 py-12 text-center">
               <Database className="mx-auto mb-2 h-6 w-6 text-[var(--muted-foreground)]" />
               <div className="text-[13px] font-medium text-[var(--foreground)]">
-                {t("No knowledge bases yet")}
+                {experienceMode === "student"
+                  ? t("No study materials yet")
+                  : experienceMode === "teacher"
+                    ? t("No course libraries yet")
+                    : t("No knowledge bases yet")}
               </div>
               <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-[var(--muted-foreground)]">
-                {t(
-                  "Create one to upload documents and retrieve grounded context in chat.",
-                )}
+                {advancedExperience
+                  ? t(
+                      "Create one to upload documents and retrieve grounded context in chat.",
+                    )
+                  : t(
+                      "Add PDFs, notes, or handouts to use as trusted material in chat.",
+                    )}
               </p>
               <button
                 type="button"
@@ -279,7 +311,11 @@ export default function KnowledgeHome({
                 className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-[12.5px] font-medium text-[var(--primary-foreground)] transition-opacity hover:opacity-90"
               >
                 <Plus size={14} />
-                {t("New knowledge base")}
+                {experienceMode === "student"
+                  ? t("Add materials")
+                  : experienceMode === "teacher"
+                    ? t("New course library")
+                    : t("New knowledge base")}
               </button>
             </div>
           ) : filteredKbs.length === 0 ? (
@@ -310,9 +346,11 @@ export default function KnowledgeHome({
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)]">
-                      <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5">
-                        {providerName(kbProvider(kb))}
-                      </span>
+                      {advancedExperience && (
+                        <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5">
+                          {providerName(kbProvider(kb))}
+                        </span>
+                      )}
                       {docs !== null && (
                         <span>
                           {docs} {t("docs")}
