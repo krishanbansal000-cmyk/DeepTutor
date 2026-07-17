@@ -11,6 +11,7 @@ MinerU/Docling asset convention the cache loader expects).
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 from pathlib import Path
 import re
@@ -56,6 +57,9 @@ class PyMuPDF4LLMParser:
                 "write_images": config.write_images,
                 "image_format": config.image_format,
                 "image_dpi": config.image_dpi,
+                # Part of the signature so existing markdown-only cache entries
+                # are refreshed with page-aware structured blocks.
+                "page_chunks": True,
             },
         )
 
@@ -84,7 +88,10 @@ class PyMuPDF4LLMParser:
             on_output(f"Converting {source_path.name} via PyMuPDF4LLM…")
 
         images_dir = workdir / "images"
-        kwargs: dict[str, object] = {"show_progress": False}
+        kwargs: dict[str, object] = {
+            "show_progress": False,
+            "page_chunks": True,
+        }
         if config.write_images:
             images_dir.mkdir(parents=True, exist_ok=True)
             kwargs.update(
@@ -95,18 +102,49 @@ class PyMuPDF4LLMParser:
             )
 
         try:
-            markdown = to_markdown(str(source_path), **kwargs)
+            converted = to_markdown(str(source_path), **kwargs)
         except Exception as exc:  # noqa: BLE001 - surface as a parser error
             raise ParserError(f"PyMuPDF4LLM failed to convert {source_path.name}: {exc}")
 
+        page_blocks: list[dict[str, object]] = []
+        if isinstance(converted, list):
+            for index, chunk in enumerate(converted):
+                if not isinstance(chunk, dict):
+                    continue
+                text = str(chunk.get("text") or "").strip()
+                if not text:
+                    continue
+                metadata = chunk.get("metadata")
+                page = metadata.get("page") if isinstance(metadata, dict) else None
+                if page in (None, ""):
+                    page = index + 1
+                page_blocks.append(
+                    {
+                        "type": "text",
+                        "text": text,
+                        "page": page,
+                        "page_label": str(page),
+                    }
+                )
+            markdown = "\n\n".join(str(block["text"]) for block in page_blocks)
+        else:
+            markdown = str(converted)
+
         if config.write_images:
             markdown = self._portable_image_links(str(markdown), images_dir)
+            for block in page_blocks:
+                block["text"] = self._portable_image_links(str(block["text"]), images_dir)
             # Drop the images dir if nothing was actually extracted, so the
             # cache loader doesn't report an empty asset_dir.
             if images_dir.is_dir() and not any(images_dir.iterdir()):
                 images_dir.rmdir()
 
         (workdir / f"{source_path.stem}.md").write_text(str(markdown), encoding="utf-8")
+        if page_blocks:
+            (workdir / f"{source_path.stem}_content_list.json").write_text(
+                json.dumps(page_blocks, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
 
     @staticmethod
     def _resolve_to_markdown() -> Callable[..., object]:

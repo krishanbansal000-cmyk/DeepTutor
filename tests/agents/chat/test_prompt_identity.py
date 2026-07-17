@@ -106,7 +106,10 @@ def test_normal_chat_prompt_enables_selective_math_and_diagrams():
     assert "`$...$`" in policy
     assert "`$$...$$`" in policy
     assert "fenced `mermaid` diagram" in policy
+    assert "Never mention KaTeX, Mermaid" in policy
+    assert "AT MOST ONE" in policy
+    assert "Never introduce it as a \"Mermaid diagram\"" in policy
     assert "Do not require a visualization mode" in policy
     assert "portable Mermaid 11 syntax" in policy
-    assert "no HTML or click directives" in policy
-    assert "Prefer prose for simple answers" in policy
+    assert "absolutely no HTML" in policy
+    assert "Prefer prose" in policy

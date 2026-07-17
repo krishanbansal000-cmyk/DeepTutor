@@ -49,6 +49,13 @@ test("normalizeMarkdownForDisplay links research citations to exact references",
   );
 });
 
+test("normalizeMarkdownForDisplay links RAG citations to exact source cards", () => {
+  assert.equal(
+    normalizeMarkdownForDisplay("Pointers use addresses [rag-123456]."),
+    'Pointers use addresses [1](#ref-rag-123456 "citation").',
+  );
+});
+
 test("normalizeMarkdownForDisplay numbers research citations from reference list order", () => {
   const refs =
     '<details id="references" open><summary>参考资料</summary><ol>' +

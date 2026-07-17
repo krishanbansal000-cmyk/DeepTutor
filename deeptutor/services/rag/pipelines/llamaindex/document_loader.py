@@ -54,6 +54,7 @@ class _ImageSource:
     path: Path
     origin: Path
     description_hint: str = ""
+    page_label: str = ""
 
 
 class LlamaIndexDocumentLoader:
@@ -70,8 +71,9 @@ class LlamaIndexDocumentLoader:
         for file_path_str in classification.parser_files:
             file_path = Path(file_path_str)
             self.logger.info(f"Parsing document: {file_path.name}")
-            text, extracted_images = self._parse_document(file_path)
-            self._append_if_nonempty(documents, file_path, text)
+            text, extracted_images, blocks = self._parse_document(file_path)
+            if not self._append_page_documents(documents, file_path, blocks):
+                self._append_if_nonempty(documents, file_path, text)
             image_sources.extend(extracted_images)
 
         for file_path_str in classification.text_files:
@@ -92,10 +94,13 @@ class LlamaIndexDocumentLoader:
 
         return documents
 
-    def _parse_document(self, file_path: Path) -> tuple[str, list[_ImageSource]]:
+    def _parse_document(
+        self,
+        file_path: Path,
+    ) -> tuple[str, list[_ImageSource], list[dict[str, Any]]]:
         """Parse a document through the shared, engine-pluggable parse layer.
 
-        Returns ``(text, extracted_images)``. A parse failure (engine
+        Returns ``(text, extracted_images, structured_blocks)``. A parse failure (engine
         unavailable, unsupported format for the active engine, or models not
         ready) is logged and the file is skipped — matching the sibling
         LightRAG/GraphRAG pipelines — rather than aborting the whole batch.
@@ -109,15 +114,65 @@ class LlamaIndexDocumentLoader:
                 f"Skipped {file_path.name}: the active document-parsing engine could "
                 f"not handle it ({exc}). Change the engine in Settings → Document Parsing."
             )
-            return "", []
+            return "", [], []
 
         text = parsed.markdown.strip() or self._text_from_blocks(parsed.blocks)
         images = self._collect_asset_images(
             parsed.asset_dir,
             origin=file_path,
             markdown=text,
+            blocks=list(parsed.blocks or []),
         )
-        return text, images
+        return text, images, list(parsed.blocks or [])
+
+    def _append_page_documents(
+        self,
+        documents: list[Any],
+        file_path: Path,
+        blocks: list[dict[str, Any]],
+    ) -> bool:
+        """Create one LlamaIndex document per parsed page when available."""
+        pages: dict[str, list[str]] = {}
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            text = str(block.get("text") or block.get("content") or "").strip()
+            if not text:
+                continue
+            page: Any = block.get("page_label")
+            if page in (None, ""):
+                page = block.get("page")
+            if page in (None, ""):
+                page_index = block.get("page_index", block.get("page_idx"))
+                if isinstance(page_index, int):
+                    page = page_index + 1
+            if page in (None, ""):
+                continue
+            pages.setdefault(str(page), []).append(text)
+
+        if not pages:
+            return False
+        def _page_sort_key(item: tuple[str, list[str]]) -> tuple[int, int | str]:
+            label = item[0]
+            try:
+                return (0, int(label))
+            except ValueError:
+                return (1, label)
+
+        for page, parts in sorted(pages.items(), key=_page_sort_key):
+            documents.append(
+                Document(
+                    text="\n\n".join(parts),
+                    metadata={
+                        "file_name": file_path.name,
+                        "file_path": str(file_path),
+                        "page": page,
+                        "page_label": page,
+                    },
+                )
+            )
+        self.logger.info(f"Loaded: {file_path.name} ({len(pages)} page(s))")
+        return True
 
     @staticmethod
     def _text_from_blocks(blocks: list[dict] | None) -> str:
@@ -137,6 +192,7 @@ class LlamaIndexDocumentLoader:
         *,
         origin: Path,
         markdown: str = "",
+        blocks: list[dict[str, Any]] | None = None,
     ) -> list[_ImageSource]:
         """Gather images the parse engine extracted into ``asset_dir``.
 
@@ -147,11 +203,13 @@ class LlamaIndexDocumentLoader:
         if not asset_dir or not Path(asset_dir).is_dir():
             return []
         hints = self._image_context_hints(markdown)
+        pages = self._image_page_labels(blocks)
         images = [
             _ImageSource(
                 path=child,
                 origin=origin,
                 description_hint=hints.get(child.name, ""),
+                page_label=pages.get(child.name, ""),
             )
             for child in sorted(Path(asset_dir).iterdir())
             if child.is_file() and child.suffix.lower() in FileTypeRouter.IMAGE_EXTENSIONS
@@ -161,6 +219,27 @@ class LlamaIndexDocumentLoader:
                 f"Extracted {len(images)} image(s) from {origin.name} for multimodal indexing"
             )
         return images
+
+    @staticmethod
+    def _image_page_labels(blocks: list[dict[str, Any]] | None) -> dict[str, str]:
+        """Map extracted image asset names to their source PDF page."""
+        if not blocks:
+            return {}
+        image_re = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
+        pages: dict[str, str] = {}
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            page = block.get("page_label", block.get("page", ""))
+            if page in (None, ""):
+                continue
+            text = str(block.get("text") or block.get("content") or "")
+            for match in image_re.finditer(text):
+                target = match.group(1).strip().split(maxsplit=1)[0].strip('<>"')
+                name = os.path.basename(target.replace("\\", "/"))
+                if name:
+                    pages[name] = str(page)
+        return pages
 
     @staticmethod
     def _image_context_hints(markdown: str) -> dict[str, str]:
@@ -233,7 +312,11 @@ class LlamaIndexDocumentLoader:
                 image_payload = self._load_image_payload(source.path)
                 description = ""
                 description_source = "document_context"
-                if use_vision_descriptions:
+                # Parsed PDFs can contain hundreds of extracted assets. They
+                # already receive true visual embeddings below, and nearby
+                # page text supplies the answer-facing caption. Reserve the
+                # slower vision-LLM call for standalone image sources.
+                if use_vision_descriptions and source.path == source.origin:
                     try:
                         description = await self._describe_image(
                             source.path,
@@ -293,18 +376,21 @@ class LlamaIndexDocumentLoader:
             embeddings,
         ):
             mimetype = mimetypes.guess_type(source.path.name)[0] or "application/octet-stream"
+            metadata = {
+                "file_name": source.origin.name,
+                "file_path": str(source.origin),
+                "content_type": "image",
+                "image_description": description,
+                "image_description_source": description_source,
+            }
+            if source.page_label:
+                metadata.update(page=source.page_label, page_label=source.page_label)
             nodes.append(
                 ImageNode(
                     text=f"[Image] {source.origin.name}\n\n{description}",
                     image_path=str(source.path),
                     image_mimetype=mimetype,
-                    metadata={
-                        "file_name": source.origin.name,
-                        "file_path": str(source.origin),
-                        "content_type": "image",
-                        "image_description": description,
-                        "image_description_source": description_source,
-                    },
+                    metadata=metadata,
                     embedding=embedding,
                 )
             )

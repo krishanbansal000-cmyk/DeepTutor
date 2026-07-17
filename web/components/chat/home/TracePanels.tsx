@@ -12,8 +12,11 @@ import {
 import { ChevronDown, Loader2, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import MarkdownRenderer from "@/components/common/MarkdownRenderer";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/feature-flags";
 import { formatTurnDuration, getTurnDurationSeconds } from "@/lib/trace-timing";
 import type { StreamEvent } from "@/lib/unified-ws";
+
+const SHOW_RAW_CHAT_LOGS = isFeatureEnabled(FEATURE_KEYS.CHAT_RAW_LOGS);
 
 type TraceMetadata = {
   call_id?: string;
@@ -996,7 +999,8 @@ function TraceRowBody({
             </div>
           )}
 
-          {(role === "retrieve" || kind === "math_render_output") &&
+          {SHOW_RAW_CHAT_LOGS &&
+            (role === "retrieve" || kind === "math_render_output") &&
             rawProgressEvents.length > 0 && (
               <div className="space-y-0.5">
                 <div className="not-italic text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted-foreground)]">
@@ -1623,7 +1627,7 @@ export function CallTracePanel({
 
                     const hasContent =
                       summaryEvts.length > 0 ||
-                      rawEvts.length > 0 ||
+                      (SHOW_RAW_CHAT_LOGS && rawEvts.length > 0) ||
                       inlineToolEvts.length > 0 ||
                       Boolean(genericText);
                     if (!hasContent) return null;
@@ -1642,8 +1646,9 @@ export function CallTracePanel({
                               {ev.content}
                             </div>
                           ))}
-                          {(trRole === "retrieve" ||
-                            trKind === "math_render_output") &&
+                          {SHOW_RAW_CHAT_LOGS &&
+                            (trRole === "retrieve" ||
+                              trKind === "math_render_output") &&
                             rawEvts.length > 0 && (
                               <div className="max-h-[160px] overflow-y-auto rounded-md border border-[var(--border)] bg-[#292524] px-3 py-2 font-mono text-[10px] not-italic leading-[1.55] text-[#D6D3D1] shadow-inner">
                                 {rawEvts.map((ev, ei) => (

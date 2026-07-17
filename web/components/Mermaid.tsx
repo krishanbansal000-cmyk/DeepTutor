@@ -45,6 +45,22 @@ async function loadMermaid() {
   return mermaidLoader;
 }
 
+// Mermaid treats parentheses in a bare subgraph title as syntax. Give those
+// titles an explicit id + quoted label so natural model output such as
+// `subgraph Compiled (C)` remains renderable.
+function normalizeSubgraphTitles(source: string): string {
+  let index = 0;
+  return source.replace(
+    /^(\s*)subgraph\s+(.+?[()]+.*?)\s*$/gm,
+    (line, indent: string, title: string) => {
+      if (/^[A-Za-z_][\w-]*\s*\[/.test(title)) return line;
+      index += 1;
+      const safeTitle = title.trim().replaceAll('"', "'");
+      return `${indent}subgraph drona_subgraph_${index}["${safeTitle}"]`;
+    },
+  );
+}
+
 // Re-applied on every render so theme changes pick up. mermaid.initialize()
 // is idempotent and cheap; the heavy work is the dynamic import which the
 // loader above only runs once.
@@ -115,7 +131,10 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className = "" }) => {
         const mermaid = await loadMermaid();
         applyMermaidTheme(mermaid);
         cleanupMermaidOrphans(id);
-        const { svg: renderedSvg } = await mermaid.render(id, chart.trim());
+        const { svg: renderedSvg } = await mermaid.render(
+          id,
+          normalizeSubgraphTitles(chart.trim()),
+        );
         if (!cancelled) {
           setSvg(renderedSvg);
           setError(null);

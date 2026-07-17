@@ -16,3 +16,9 @@ test("experience selector lives on the Settings landing page", () => {
   assert.match(settingsHub, /<ExperienceModeSelector \/>/);
   assert.doesNotMatch(appearancePage, /ExperienceModeSelector|Experience mode/);
 });
+
+test("user language is directly available on the Settings landing page", () => {
+  assert.match(settingsHub, /<UserLanguageSelector \/>/);
+  assert.match(appearancePage, /<LanguageButtons \/>/);
+  assert.doesNotMatch(appearancePage, /language\.chinese|\["en", "zh"/);
+});

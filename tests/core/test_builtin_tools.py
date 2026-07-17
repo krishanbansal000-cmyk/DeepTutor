@@ -151,6 +151,41 @@ async def test_rag_tool_forwards_query_and_extra_kwargs(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
+async def test_rag_tool_surfaces_document_level_citations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_rag_search(**_kwargs: Any) -> dict[str, Any]:
+        return {
+            "answer": "grounded answer",
+            "provider": "fake",
+            "sources": [
+                {
+                    "title": "c-textbook.pdf",
+                    "page": "30",
+                    "chunk_id": "chunk-5",
+                    "score": 0.91,
+                }
+            ],
+        }
+
+    _install_module(monkeypatch, "deeptutor.tools.rag_tool", rag_search=fake_rag_search)
+
+    result = await RAGTool().execute(query="What is a pointer?", kb_name="demo-kb")
+
+    assert result.sources == [
+        {
+            "title": "c-textbook.pdf",
+            "page": "30",
+            "chunk_id": "chunk-5",
+            "score": 0.91,
+            "type": "rag",
+            "query": "What is a pointer?",
+            "kb_name": "demo-kb",
+        }
+    ]
+
+
+@pytest.mark.asyncio
 async def test_rag_tool_rejects_empty_query(monkeypatch: pytest.MonkeyPatch) -> None:
     called = False
 

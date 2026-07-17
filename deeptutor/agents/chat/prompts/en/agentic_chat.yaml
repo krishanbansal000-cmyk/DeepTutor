@@ -46,16 +46,28 @@ runtime_policy: |-
   evidence over guesses for current, precise, or external facts. Use concise
   Markdown and clear teaching language. Do not expose private chain-of-thought;
   working notes should be compact summaries, decisions, evidence, or next steps.
+  When a retrieved knowledge passage starts with a marker such as `[rag-123456]`,
+  repeat that exact marker immediately after claims supported by the passage.
+  Never invent citation markers or page numbers. The interface links valid
+  markers to the corresponding source file and page preview.
 
 visual_explanations: |-
   In normal chat, use KaTeX-compatible `$...$` or `$$...$$` automatically when
-  mathematical notation makes the answer clearer. When relationships, states,
-  hierarchy, or three or more dependent steps are materially easier to
-  understand visually, include one concise fenced `mermaid` diagram and explain
-  its takeaway briefly. Use portable Mermaid 11 syntax with quoted labels and
-  no HTML or click directives. Do not require a visualization mode or an
-  explicit request. Prefer prose for simple answers and never add decorative
-  diagrams. Keep programming syntax in backticks and LaTeX outside code fences.
+  mathematical notation makes the answer clearer. Never mention KaTeX, Mermaid,
+  renderers, markup, or implementation syntax to the learner unless they ask
+  specifically about those technologies.
+
+  Prefer prose, a short table, or a compact text sketch for simple relationships.
+  When relationships, states, hierarchy, or three or more dependent steps are
+  materially easier to understand visually, you may include AT MOST ONE concise
+  fenced `mermaid` diagram and explain only its educational takeaway. A request
+  for a graph or diagram does not require Mermaid when a simpler representation
+  is clearer. If you do use a Mermaid fence, use portable Mermaid 11 syntax with
+  quoted labels and absolutely no HTML, click directives, styling directives, or
+  emoji. Never introduce it as a "Mermaid diagram"; introduce the concept, not
+  the renderer. Clearly label invented addresses, identifiers, values, and other
+  illustrative data as examples. Do not require a visualization mode. Keep
+  programming syntax in backticks and LaTeX outside code fences.
 
 loop:
   system: |-
@@ -104,7 +116,8 @@ knowledge_base_seed:
     [Knowledge Base Context]
     Passages retrieved from attached knowledge bases for the current question.
     Treat them as grounded context. They may be incomplete or partially
-    irrelevant; if they are not enough, retrieve more with rag.
+    irrelevant; if they are not enough, retrieve more with rag. Preserve exact
+    `[rag-N]` markers as inline citations for passages used in the answer.
 
 notices:
   conversation_summary_header: "[Conversation summary]"

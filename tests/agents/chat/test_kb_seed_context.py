@@ -211,6 +211,57 @@ async def test_run_seeds_each_attached_kb(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 @pytest.mark.asyncio
+async def test_run_contextual_followup_seeds_with_previous_user_topic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = _SeedRegistry()
+    client = _ScriptedChatClient([[_llm_chunk(content="Done.")]])
+    pipeline = _make_pipeline(monkeypatch, registry, client)
+
+    context = UnifiedContext(
+        session_id="s1",
+        user_message="Create a graph or diagram to explain this",
+        conversation_history=[
+            {"role": "user", "content": "What is a pointer in C?"},
+            {"role": "assistant", "content": "A pointer stores a memory address."},
+        ],
+        knowledge_bases=["c-textbook"],
+        language="en",
+        metadata={"turn_id": "t2"},
+    )
+    await _run(pipeline, context)
+
+    assert registry.executed[0]["kwargs"]["query"] == (
+        "What is a pointer in C?\n"
+        "Follow-up: Create a graph or diagram to explain this"
+    )
+
+
+@pytest.mark.asyncio
+async def test_run_standalone_question_does_not_mix_previous_topic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = _SeedRegistry()
+    client = _ScriptedChatClient([[_llm_chunk(content="Done.")]])
+    pipeline = _make_pipeline(monkeypatch, registry, client)
+
+    context = UnifiedContext(
+        session_id="s1",
+        user_message="How are files opened in C?",
+        conversation_history=[
+            {"role": "user", "content": "What is a pointer in C?"},
+            {"role": "assistant", "content": "A pointer stores a memory address."},
+        ],
+        knowledge_bases=["c-textbook"],
+        language="en",
+        metadata={"turn_id": "t2"},
+    )
+    await _run(pipeline, context)
+
+    assert registry.executed[0]["kwargs"]["query"] == "How are files opened in C?"
+
+
+@pytest.mark.asyncio
 async def test_run_skips_seed_without_kb(monkeypatch: pytest.MonkeyPatch) -> None:
     registry = _SeedRegistry()
     client = _ScriptedChatClient([[_llm_chunk(content="Plain answer.")]])

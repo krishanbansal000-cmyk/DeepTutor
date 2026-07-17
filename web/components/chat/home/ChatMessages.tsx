@@ -61,6 +61,7 @@ import ContextReferenceTree, {
   type ContextTreeItem,
 } from "./ContextReferenceTree";
 import { AssistantActivity } from "./TracePanels";
+import ChatSourceCitations from "./ChatSourceCitations";
 import { agentGlyph } from "@/components/agents/agent-icons";
 import { useConnectedAgentKinds } from "@/hooks/useConnectedAgentKinds";
 
@@ -1378,6 +1379,11 @@ export const ChatMessageList = memo(function ChatMessageList({
 
         return (
           <div key={`${msg.role}-${i}`} className="w-full">
+            <ChatSourceCitations
+              events={msg.events ?? []}
+              answer={msg.content}
+              onOpen={onPreviewAttachment}
+            />
             <InlineFileCardProvider
               attachments={msg.attachments ?? []}
               events={msg.events}

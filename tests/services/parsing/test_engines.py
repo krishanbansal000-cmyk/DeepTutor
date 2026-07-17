@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import zipfile
 
 import pytest
@@ -167,6 +168,10 @@ def test_pymupdf4llm_parses_pdf_and_extracts_images(tmp_path) -> None:
 
     md = (workdir / "doc.md").read_text(encoding="utf-8")
     assert "DeepTutor" in md
+    blocks = json.loads((workdir / "doc_content_list.json").read_text(encoding="utf-8"))
+    assert blocks[0]["page"] == 1
+    assert blocks[0]["page_label"] == "1"
+    assert "DeepTutor" in blocks[0]["text"]
     images = workdir / "images"
     assert images.is_dir()
     extracted = list(images.glob("*.png"))

@@ -11,6 +11,7 @@ import {
 import {
   getStoredTheme,
   getSystemTheme,
+  normalizeTheme,
   setTheme as applyThemePreference,
   subscribeToThemeChanges,
   type Theme,
@@ -84,9 +85,21 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
       .then(async (response) => {
         if (!response.ok) return;
         const payload = (await response.json()) as {
-          ui?: { experience_mode?: unknown };
+          ui?: {
+            theme?: unknown;
+            language?: unknown;
+            experience_mode?: unknown;
+          };
         };
+        const nextTheme = normalizeTheme(payload.ui?.theme);
+        const nextLanguage = normalizeLanguage(
+          payload.ui?.language == null ? undefined : String(payload.ui.language),
+        );
         const mode = normalizeExperienceMode(payload.ui?.experience_mode);
+        applyThemePreference(nextTheme);
+        setThemeState(nextTheme);
+        writeStoredLanguage(nextLanguage);
+        setLanguageState(nextLanguage);
         writeStoredExperienceMode(mode);
         setExperienceModeState(mode);
       })

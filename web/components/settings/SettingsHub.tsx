@@ -13,6 +13,7 @@ import {
 } from "@/components/settings/SettingsContext";
 import SettingsStatusPanel from "@/components/settings/SettingsStatusPanel";
 import ExperienceModeSelector from "@/components/settings/ExperienceModeSelector";
+import UserLanguageSelector from "@/components/settings/UserLanguageSelector";
 import {
   SETTINGS_CATEGORIES,
   type Lang,
@@ -128,6 +129,8 @@ export default function SettingsHub() {
       </header>
 
       <ExperienceModeSelector />
+
+      <UserLanguageSelector />
 
       {advanced && <SettingsStatusPanel />}
 

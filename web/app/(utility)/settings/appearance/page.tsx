@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { useSettings } from "@/components/settings/SettingsContext";
 import { ThemePreviewCard } from "@/components/settings/ThemePreviewCard";
+import { LanguageButtons } from "@/components/settings/UserLanguageSelector";
 import {
   SettingRow,
   SettingSection,
@@ -12,12 +13,7 @@ import {
 
 export default function AppearanceSettingsPage() {
   const { t } = useTranslation();
-  const {
-    theme,
-    language,
-    updateTheme,
-    updateLanguage,
-  } = useSettings();
+  const { theme, updateTheme } = useSettings();
 
   return (
     <div data-tour="tour-appearance">
@@ -37,31 +33,7 @@ export default function AppearanceSettingsPage() {
           description={t(
             "Sets the interface and tutor response language. Regional modes keep code and technical terms in English.",
           )}
-          control={
-            <div className="flex flex-wrap gap-0.5 rounded-lg bg-[var(--muted)] p-0.5">
-              {(["en", "hi", "bundeli", "awadhi", "bhojpuri"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => updateLanguage(v)}
-                  className={`rounded-md px-2.5 py-1 text-[12px] transition-all ${
-                    language === v
-                      ? "bg-[var(--card)] font-medium text-[var(--foreground)] shadow-sm"
-                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                  }`}
-                >
-                  {v === "en"
-                    ? t("language.english")
-                    : v === "hi"
-                      ? t("language.hindi")
-                      : v === "bundeli"
-                        ? t("language.bundeli")
-                        : v === "awadhi"
-                          ? t("language.awadhi")
-                          : t("language.bhojpuri")}
-                </button>
-              ))}
-            </div>
-          }
+          control={<LanguageButtons />}
         />
       </SettingSection>
 
@@ -79,7 +51,7 @@ export default function AppearanceSettingsPage() {
             {(
               [
                 { id: "snow", label: t("Default") },
-                { id: "light", label: t("Cream") },
+                { id: "light", label: t("Light Beige") },
                 { id: "dark", label: t("Dark") },
                 { id: "glass", label: t("Glass") },
               ] as const
@@ -95,7 +67,7 @@ export default function AppearanceSettingsPage() {
           </div>
           <p className="mt-4 text-[11.5px] leading-relaxed text-[var(--muted-foreground)]/80">
             {t(
-              "Default and Cream use a warm beige paper-like background. Dark keeps Cream's warmth on near-black. Glass adds translucent purple panels on a deep gradient.",
+              "Default and Light Beige use a warm paper-like background. Dark keeps the same warmth on near-black. Glass adds translucent purple panels on a deep gradient.",
             )}
           </p>
         </div>

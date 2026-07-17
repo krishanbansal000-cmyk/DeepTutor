@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -200,14 +201,26 @@ class LlamaIndexPipeline:
         context_parts: list[str] = []
         sources: list[dict[str, Any]] = []
         for i, node in enumerate(nodes):
-            context_parts.append(node.node.text)
             meta = node.node.metadata or {}
+            title = meta.get("file_name", meta.get("title", f"Document {i + 1}"))
+            page = meta.get("page_label", meta.get("page", ""))
+            # Stable per-file marker: repeated retrievals in the same turn use
+            # the same id, so inline citations always resolve to one source
+            # card instead of depending on retrieval rank.
+            source_identity = meta.get("file_path", title)
+            digest = hashlib.sha1(str(source_identity).encode("utf-8")).hexdigest()
+            citation_id = f"rag-{int(digest[:8], 16) % 900000 + 100000}"
+            source_label = str(title)
+            if page not in (None, ""):
+                source_label += f", page {page}"
+            context_parts.append(f"[{citation_id}] Source: {source_label}\n{node.node.text}")
             sources.append(
                 {
-                    "title": meta.get("file_name", meta.get("title", f"Document {i + 1}")),
+                    "citation_id": citation_id,
+                    "title": title,
                     "content": node.node.text[:200],
                     "source": meta.get("file_path", meta.get("file_name", "")),
-                    "page": meta.get("page_label", meta.get("page", "")),
+                    "page": page,
                     "chunk_id": node.node.node_id or str(i),
                     "score": round(node.score, 4) if node.score is not None else "",
                 }

@@ -10,6 +10,15 @@ export const THEME_STORAGE_KEY = "deeptutor-theme";
 type ThemeChangeListener = (theme: Theme) => void;
 const themeListeners = new Set<ThemeChangeListener>();
 
+export function normalizeTheme(value: unknown): Theme {
+  return value === "light" ||
+    value === "dark" ||
+    value === "glass" ||
+    value === "snow"
+    ? value
+    : "snow";
+}
+
 /**
  * Subscribe to theme changes
  */
@@ -67,7 +76,7 @@ export function saveThemeToStorage(theme: Theme): boolean {
 
 /**
  * Get system preference for theme.
- * Light systems get "snow" (the pure-white Default theme); dark systems
+ * Light systems get "snow" (the beige-paper Default theme); dark systems
  * get "dark". Must stay in sync with the inline ThemeScript fallback.
  */
 export function getSystemTheme(): Theme {

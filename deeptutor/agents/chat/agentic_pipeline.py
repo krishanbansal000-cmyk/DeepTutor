@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Any
 
 from deeptutor.agents._shared.tool_composition import (
@@ -93,6 +94,24 @@ def _drop_unconfigured_generation_tools(tools: list[str]) -> list[str]:
 
 KB_SEED_MAX_KBS = 3
 KB_SEED_CHARS_PER_KB = 4000
+KB_SEED_PREVIOUS_TURN_CHARS = 600
+
+_CONTEXTUAL_FOLLOWUP_RE = re.compile(
+    r"\b(?:this|that|these|those|it|its|above|previous|earlier|same)\b",
+    re.IGNORECASE,
+)
+_CONTEXTUAL_FOLLOWUP_PREFIXES = (
+    "and ",
+    "but ",
+    "can you expand",
+    "can you explain more",
+    "could you expand",
+    "could you explain more",
+    "explain more",
+    "go on",
+    "tell me more",
+    "what about",
+)
 # Exploring-loop budget: max LLM rounds in one turn's loop. A round without
 # tool calls ends the loop early — that is the normal exit.
 DEFAULT_MAX_ROUNDS = 8
@@ -109,6 +128,44 @@ def _read_int(cfg: Any, *, key: str, default: int) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _kb_seed_query(context: UnifiedContext) -> str:
+    """Return a retrieval query that resolves short contextual follow-ups.
+
+    The model receives the full conversation, but pre-loop KB retrieval is a
+    separate server-side operation.  A literal query such as ``explain this``
+    loses the subject from the preceding turn, so combine it with the most
+    recent user question when the current message is visibly referential.
+    Standalone questions remain untouched to avoid contaminating retrieval
+    with an unrelated earlier topic.
+    """
+
+    current = (context.user_message or "").strip()
+    if not current:
+        return ""
+
+    lowered = current.casefold()
+    is_contextual = bool(_CONTEXTUAL_FOLLOWUP_RE.search(current)) or lowered.startswith(
+        _CONTEXTUAL_FOLLOWUP_PREFIXES
+    )
+    if not is_contextual:
+        return current
+
+    previous_user = ""
+    for item in reversed(context.conversation_history or []):
+        if item.get("role") != "user":
+            continue
+        content = item.get("content")
+        if isinstance(content, str) and content.strip():
+            previous_user = content.strip()
+            break
+
+    if not previous_user:
+        return current
+    if len(previous_user) > KB_SEED_PREVIOUS_TURN_CHARS:
+        previous_user = previous_user[:KB_SEED_PREVIOUS_TURN_CHARS].rstrip() + "..."
+    return f"{previous_user}\nFollow-up: {current}"
 
 
 def _normalise_user_reply(raw: Any) -> tuple[str, list[dict[str, str]] | None]:
@@ -1014,7 +1071,7 @@ class AgenticChatPipeline:
         if self._exclusive_capability_active(context):
             return ""
         kbs = self._selected_kbs(context)
-        query = (context.user_message or "").strip()
+        query = _kb_seed_query(context)
         if not kbs or not query:
             return ""
         if len(kbs) > KB_SEED_MAX_KBS:

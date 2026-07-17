@@ -68,6 +68,36 @@ def test_loader_routes_parser_files_through_active_parse_engine(
     assert "Block two" in by_name["paper.pdf"]
 
 
+def test_loader_preserves_parser_page_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("llama_index.core")
+    from deeptutor.services.parsing.types import ParsedDocument
+    from deeptutor.services.rag.pipelines.llamaindex.document_loader import (
+        LlamaIndexDocumentLoader,
+    )
+
+    pdf_path = tmp_path / "book.pdf"
+    pdf_path.write_bytes(b"stub")
+    _install_stub_parse_service(
+        monkeypatch,
+        {
+            "book.pdf": ParsedDocument(
+                markdown="Page two\n\nPage ten",
+                blocks=[
+                    {"type": "text", "text": "Page ten", "page": 10},
+                    {"type": "text", "text": "Page two", "page_label": "2"},
+                ],
+            )
+        },
+    )
+
+    documents = asyncio.run(LlamaIndexDocumentLoader().load([str(pdf_path)]))
+
+    assert [doc.metadata["page"] for doc in documents] == ["2", "10"]
+    assert [doc.text for doc in documents] == ["Page two", "Page ten"]
+
+
 def test_loader_skips_document_when_active_engine_cannot_parse(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -149,8 +179,9 @@ def test_loader_indexes_images_extracted_from_parsed_document(
     assert node.metadata["content_type"] == "image"
     # Provenance: the extracted image cites the source document, not the cache asset.
     assert node.metadata["file_name"] == "paper.pdf"
+    assert node.metadata["image_description_source"] == "source_fallback"
     assert node.image_path == str(asset_dir / "figure-1.png")
-    assert "Figure showing a bar chart." in node.text
+    assert "Visual extracted from paper.pdf" in node.text
 
 
 def test_loader_skips_images_when_embedding_provider_is_text_only(
@@ -248,6 +279,16 @@ def test_loader_embeds_images_with_document_context_when_llm_is_text_only(
                     "The window shows a Count button above a Close window button."
                 ),
                 asset_dir=asset_dir,
+                blocks=[
+                    {
+                        "type": "text",
+                        "page": 7,
+                        "text": (
+                            "## Counting buttons\n\n![](images/photo.png)\n\n"
+                            "The window shows a Count button."
+                        ),
+                    }
+                ],
             )
         },
     )
@@ -277,6 +318,7 @@ def test_loader_embeds_images_with_document_context_when_llm_is_text_only(
     assert image_nodes[0].embedding == [0.1, 0.2, 0.3]
     assert "Count button" in image_nodes[0].metadata["image_description"]
     assert image_nodes[0].metadata["image_description_source"] == "document_context"
+    assert image_nodes[0].metadata["page"] == "7"
 
 
 def test_loader_logs_missing_multimodal_embedding_requirement(

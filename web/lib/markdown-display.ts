@@ -380,6 +380,7 @@ const REFERENCE_LIST_START_REGEX =
 const REFERENCE_LIST_DATA_ID_REGEX =
   /data-citation-id=["'](CIT-\d+-\d+|PLAN-\d+)["']/gi;
 const RESEARCH_CITATION_ID_TEXT_REGEX = /\b(CIT-\d+-\d+|PLAN-\d+)\b/gi;
+const RAG_CITATION_ID_TEXT_REGEX = /\b(rag-\d+)\b/gi;
 
 /**
  * Decide whether a bracketed comma list is a citation group rather than a plain
@@ -460,7 +461,7 @@ function linkifyCitations(content: string): string {
 
 export function citationAnchorIdFor(id: string): string | null {
   const normalized = String(id || "").trim();
-  if (!/^(?:CIT-\d+-\d+|PLAN-\d+)$/i.test(normalized)) return null;
+  if (!/^(?:rag-\d+|CIT-\d+-\d+|PLAN-\d+)$/i.test(normalized)) return null;
   return `ref-${normalized.toLowerCase().replace(/[^a-z0-9_-]+/g, "-")}`;
 }
 
@@ -500,6 +501,12 @@ function buildResearchCitationNumberMap(content: string): Map<string, number> {
       add(match[1] || "");
     }
   }
+  // Normal chat has no generated reference list. Number RAG source markers by
+  // first appearance; the source-card component uses the same ordering.
+  for (const match of content.matchAll(RAG_CITATION_ID_TEXT_REGEX)) {
+    const id = String(match[1] || "").trim();
+    if (!map.has(id)) map.set(id, map.size + 1);
+  }
   return map;
 }
 
@@ -512,7 +519,7 @@ function formatCitationLinks(
     .map((id) => id.trim())
     .filter(Boolean);
   if (!ids.length) return `[${refs}](#references "citation")`;
-  if (ids.every(isResearchCitationId)) {
+  if (ids.every((id) => isResearchCitationId(id) || /^rag-\d+$/i.test(id))) {
     return ids
       .map((id) => {
         const number = citationNumbers.get(id) ?? Number.NaN;
