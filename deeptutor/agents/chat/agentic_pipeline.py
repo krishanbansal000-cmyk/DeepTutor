@@ -189,7 +189,17 @@ class AgenticChatPipeline:
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> None:
-        self.language = "zh" if language.lower().startswith("zh") else "en"
+        normalized_language = (language or "en").strip().lower()
+        if normalized_language.startswith("zh"):
+            self.language = "zh"
+        elif normalized_language in {"hi", "hindi", "hinglish"}:
+            self.language = "hi"
+        elif normalized_language in {"bundeli", "bundelkhandi"}:
+            self.language = "bundeli"
+        elif normalized_language in {"awadhi", "bhojpuri"}:
+            self.language = normalized_language
+        else:
+            self.language = "en"
         self.llm_config = get_llm_config()
         self.binding = getattr(self.llm_config, "binding", None) or "openai"
         self.model = getattr(self.llm_config, "model", None)
@@ -249,6 +259,7 @@ class AgenticChatPipeline:
         self._client_config = LLMClientConfig(
             binding=self.binding,
             model=self.model,
+            vision_model=getattr(self.llm_config, "vision_model", None),
             api_key=self.api_key,
             base_url=self.base_url,
             api_version=self.api_version,

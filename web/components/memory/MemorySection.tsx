@@ -144,7 +144,7 @@ interface SurfaceMeta {
 const SURFACE_META: Record<Surface, SurfaceMeta> = {
   chat: { icon: MessageSquare, label: "Chat" },
   notebook: { icon: NotebookPen, label: "Notebook" },
-  quiz: { icon: ClipboardList, label: "题库" },
+  quiz: { icon: ClipboardList, label: "Question Bank" },
   kb: { icon: BookOpen, label: "Knowledge base" },
   book: { icon: Library, label: "Book" },
   partner: { icon: Bot, label: "Partner" },
@@ -152,10 +152,10 @@ const SURFACE_META: Record<Surface, SurfaceMeta> = {
 };
 
 const L3_LABELS: Record<string, string> = {
-  recent: "近期总结",
-  profile: "用户画像",
-  scope: "知识 Scope",
-  preferences: "偏好",
+  recent: "Recent summary",
+  profile: "Learner profile",
+  scope: "Knowledge scope",
+  preferences: "Preferences",
 };
 
 // Entity refs in L2/L3 docs are written as `<surface>:<entity_id>`.

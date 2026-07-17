@@ -120,7 +120,7 @@ def test_loader_indexes_images_extracted_from_parsed_document(
         def supports_multimodal_contents(self) -> bool:
             return True
 
-        async def embed_contents(self, contents):
+        async def embed_contents(self, contents, **_kwargs):
             return [[0.4, 0.5, 0.6] for _ in contents]
 
     class _VisionClient:
@@ -193,7 +193,7 @@ def test_loader_embeds_images_when_embedding_provider_is_multimodal(
         def supports_multimodal_contents(self) -> bool:
             return True
 
-        async def embed_contents(self, contents):
+        async def embed_contents(self, contents, **_kwargs):
             captured["contents"] = contents
             return [[0.1, 0.2, 0.3]]
 
@@ -223,20 +223,43 @@ def test_loader_embeds_images_when_embedding_provider_is_multimodal(
     assert captured["llm_kwargs"]["image_mime_type"] == "image/png"
 
 
-def test_loader_skips_images_when_llm_is_text_only(
+def test_loader_embeds_images_with_document_context_when_llm_is_text_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     pytest.importorskip("llama_index.core")
+    from llama_index.core.schema import ImageNode
+
+    from deeptutor.services.parsing.types import ParsedDocument
     from deeptutor.services.rag.pipelines.llamaindex import document_loader as loader_module
 
-    image_path = tmp_path / "photo.png"
+    pdf_path = tmp_path / "lesson.pdf"
+    pdf_path.write_bytes(b"stub")
+    asset_dir = tmp_path / "assets"
+    asset_dir.mkdir()
+    image_path = asset_dir / "photo.png"
     image_path.write_bytes(b"\x89PNG\r\n")
+    _install_stub_parse_service(
+        monkeypatch,
+        {
+            "lesson.pdf": ParsedDocument(
+                markdown=(
+                    "## Counting buttons\n\n"
+                    "![](images/photo.png)\n\n"
+                    "The window shows a Count button above a Close window button."
+                ),
+                asset_dir=asset_dir,
+            )
+        },
+    )
 
     class _MultimodalEmbeddingClient:
         config = type("Config", (), {"binding": "siliconflow", "model": "qwen3-vl"})()
 
         def supports_multimodal_contents(self) -> bool:
             return True
+
+        async def embed_contents(self, contents, **_kwargs):
+            return [[0.1, 0.2, 0.3] for _ in contents]
 
     class _TextOnlyLLMClient:
         config = type("Config", (), {"binding": "openai", "model": "gpt-3.5-turbo"})()
@@ -247,12 +270,16 @@ def test_loader_skips_images_when_llm_is_text_only(
     monkeypatch.setattr(loader_module, "get_embedding_client", lambda: _MultimodalEmbeddingClient())
     monkeypatch.setattr(loader_module, "get_llm_client", lambda: _TextOnlyLLMClient())
 
-    documents = asyncio.run(loader_module.LlamaIndexDocumentLoader().load([str(image_path)]))
+    documents = asyncio.run(loader_module.LlamaIndexDocumentLoader().load([str(pdf_path)]))
 
-    assert documents == []
+    image_nodes = [doc for doc in documents if isinstance(doc, ImageNode)]
+    assert len(image_nodes) == 1
+    assert image_nodes[0].embedding == [0.1, 0.2, 0.3]
+    assert "Count button" in image_nodes[0].metadata["image_description"]
+    assert image_nodes[0].metadata["image_description_source"] == "document_context"
 
 
-def test_loader_logs_all_missing_multimodal_image_requirements(
+def test_loader_logs_missing_multimodal_embedding_requirement(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     pytest.importorskip("llama_index.core")
@@ -267,21 +294,11 @@ def test_loader_logs_all_missing_multimodal_image_requirements(
         def supports_multimodal_contents(self) -> bool:
             return False
 
-    class _TextOnlyLLMClient:
-        config = type("Config", (), {"binding": "openai", "model": "gpt-3.5-turbo"})()
-
-        def supports_multimodal_images(self) -> bool:
-            return False
-
     monkeypatch.setattr(loader_module, "get_embedding_client", lambda: _TextOnlyEmbeddingClient())
-    monkeypatch.setattr(loader_module, "get_llm_client", lambda: _TextOnlyLLMClient())
 
     with caplog.at_level("WARNING"):
         documents = asyncio.run(loader_module.LlamaIndexDocumentLoader().load([str(image_path)]))
 
     assert documents == []
-    assert "requires both multimodal embedding and multimodal LLM support" in caplog.text
-    assert "embedding provider/model does not support multimodal contents" in caplog.text
-    assert "LLM provider/model does not support multimodal image input" in caplog.text
+    assert "requires a multimodal embedding provider/model" in caplog.text
     assert "text-embedding-3-small" in caplog.text
-    assert "gpt-3.5-turbo" in caplog.text

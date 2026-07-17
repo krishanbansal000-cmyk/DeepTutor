@@ -33,53 +33,61 @@ function toRel(p, root) {
 const webRoot = path.resolve(process.cwd());
 const localesRoot = path.join(webRoot, "locales");
 const enRoot = path.join(localesRoot, "en");
-const zhRoot = path.join(localesRoot, "zh");
+const translatedLocales = ["zh", "hi"];
 
-if (!fs.existsSync(enRoot) || !fs.existsSync(zhRoot)) {
-  console.error(`[i18n:parity] Missing locales roots: ${enRoot} or ${zhRoot}`);
+if (!fs.existsSync(enRoot)) {
+  console.error(`[i18n:parity] Missing source locale root: ${enRoot}`);
   process.exit(2);
 }
 
 const enFiles = listJsonFiles(enRoot).map((p) => toRel(p, enRoot)).sort();
-const zhFiles = listJsonFiles(zhRoot).map((p) => toRel(p, zhRoot)).sort();
-
-const missingInZh = enFiles.filter((f) => !zhFiles.includes(f));
-const extraInZh = zhFiles.filter((f) => !enFiles.includes(f));
-
 let ok = true;
-if (missingInZh.length) {
-  ok = false;
-  console.error("[i18n:parity] Missing zh files:");
-  for (const f of missingInZh) console.error(`- ${f}`);
-}
-if (extraInZh.length) {
-  ok = false;
-  console.error("[i18n:parity] Extra zh files:");
-  for (const f of extraInZh) console.error(`- ${f}`);
-}
 
-for (const rel of enFiles) {
-  if (!zhFiles.includes(rel)) continue;
-  const enPath = path.join(enRoot, rel);
-  const zhPath = path.join(zhRoot, rel);
-  const enJson = loadJson(enPath);
-  const zhJson = loadJson(zhPath);
-  const enKeys = new Set(flattenKeys(enJson));
-  const zhKeys = new Set(flattenKeys(zhJson));
-
-  const missingKeys = [...enKeys].filter((k) => !zhKeys.has(k)).sort();
-  const extraKeys = [...zhKeys].filter((k) => !enKeys.has(k)).sort();
-
-  if (missingKeys.length || extraKeys.length) {
+for (const locale of translatedLocales) {
+  const localeRoot = path.join(localesRoot, locale);
+  if (!fs.existsSync(localeRoot)) {
     ok = false;
-    console.error(`[i18n:parity] Key mismatch in ${rel}`);
-    if (missingKeys.length) {
-      console.error("  Missing zh keys:");
-      for (const k of missingKeys) console.error(`  - ${k}`);
-    }
-    if (extraKeys.length) {
-      console.error("  Extra zh keys:");
-      for (const k of extraKeys) console.error(`  - ${k}`);
+    console.error(`[i18n:parity] Missing locale root: ${localeRoot}`);
+    continue;
+  }
+
+  const localeFiles = listJsonFiles(localeRoot)
+    .map((p) => toRel(p, localeRoot))
+    .sort();
+  const missingFiles = enFiles.filter((f) => !localeFiles.includes(f));
+  const extraFiles = localeFiles.filter((f) => !enFiles.includes(f));
+
+  if (missingFiles.length) {
+    ok = false;
+    console.error(`[i18n:parity] Missing ${locale} files:`);
+    for (const f of missingFiles) console.error(`- ${f}`);
+  }
+  if (extraFiles.length) {
+    ok = false;
+    console.error(`[i18n:parity] Extra ${locale} files:`);
+    for (const f of extraFiles) console.error(`- ${f}`);
+  }
+
+  for (const rel of enFiles) {
+    if (!localeFiles.includes(rel)) continue;
+    const enJson = loadJson(path.join(enRoot, rel));
+    const localeJson = loadJson(path.join(localeRoot, rel));
+    const enKeys = new Set(flattenKeys(enJson));
+    const localeKeys = new Set(flattenKeys(localeJson));
+    const missingKeys = [...enKeys].filter((k) => !localeKeys.has(k)).sort();
+    const extraKeys = [...localeKeys].filter((k) => !enKeys.has(k)).sort();
+
+    if (missingKeys.length || extraKeys.length) {
+      ok = false;
+      console.error(`[i18n:parity] Key mismatch in ${locale}/${rel}`);
+      if (missingKeys.length) {
+        console.error(`  Missing ${locale} keys:`);
+        for (const k of missingKeys) console.error(`  - ${k}`);
+      }
+      if (extraKeys.length) {
+        console.error(`  Extra ${locale} keys:`);
+        for (const k of extraKeys) console.error(`  - ${k}`);
+      }
     }
   }
 }

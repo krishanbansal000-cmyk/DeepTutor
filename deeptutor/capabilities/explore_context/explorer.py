@@ -101,6 +101,7 @@ class ContextExplorer:
         self._client_config = LLMClientConfig(
             binding=self.binding,
             model=self.model,
+            vision_model=getattr(cfg, "vision_model", None),
             api_key=self.api_key,
             base_url=self.base_url,
             api_version=self.api_version,

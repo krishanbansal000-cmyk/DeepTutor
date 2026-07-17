@@ -338,7 +338,10 @@ export default function PartnerConfigure({
             >
               <option value="">{t("Auto (English)")}</option>
               <option value="en">English</option>
-              <option value="zh">中文</option>
+              <option value="hi">हिन्दी / Hinglish</option>
+              <option value="bundeli">बुन्देली / Bundeli</option>
+              <option value="awadhi">अवधी / Awadhi</option>
+              <option value="bhojpuri">भोजपुरी / Bhojpuri</option>
             </select>
           </div>
           <div className="sm:col-span-2">

@@ -175,15 +175,19 @@ def parse_language(language: Any) -> str:
     Supported language representations:
     - English: "en", "english", "English"
     - Chinese: "zh", "chinese", "Chinese"
+    - Hindi/Hinglish: "hi", "hindi", "hinglish"
+    - Bundeli: "bundeli", "bundelkhandi"
+    - Awadhi: "awadhi"
+    - Bhojpuri: "bhojpuri"
 
     Args:
         language: Language configuration value (can be "zh"/"en"/"Chinese"/"English" etc.)
 
     Returns:
-        Standardized language code: 'zh' or 'en', defaults to 'zh'
+        Standardized supported language code, defaults to 'en'
     """
     if not language:
-        return "zh"
+        return "en"
 
     if isinstance(language, str):
         lang_lower = language.lower()
@@ -191,8 +195,16 @@ def parse_language(language: Any) -> str:
             return "en"
         if lang_lower in ["zh", "chinese", "cn"]:
             return "zh"
+        if lang_lower in ["hi", "hindi", "hinglish"]:
+            return "hi"
+        if lang_lower in ["bundeli", "bundelkhandi"]:
+            return "bundeli"
+        if lang_lower == "awadhi":
+            return "awadhi"
+        if lang_lower == "bhojpuri":
+            return "bhojpuri"
 
-    return "zh"  # Default Chinese
+    return "en"
 
 
 def get_agent_params(module_name: str) -> dict:

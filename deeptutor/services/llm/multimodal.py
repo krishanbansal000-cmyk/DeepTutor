@@ -298,6 +298,35 @@ def has_image_parts(messages: list[dict[str, Any]]) -> bool:
     return False
 
 
+def has_image_attachments(attachments: list[Any] | None) -> bool:
+    """Return True when an attachment list contains a usable image."""
+    return any(
+        getattr(attachment, "type", "") == "image"
+        and bool(getattr(attachment, "base64", "") or getattr(attachment, "url", ""))
+        for attachment in attachments or []
+    )
+
+
+def model_for_image_request(
+    model: str | None,
+    vision_model: str | None,
+    *,
+    messages: list[dict[str, Any]] | None = None,
+    attachments: list[Any] | None = None,
+    image_data: str | None = None,
+) -> str | None:
+    """Select the vision model only when a request actually carries an image.
+
+    Credentials and the endpoint remain unchanged. This is a model-only route
+    for gateways exposing text and vision models through one compatible API.
+    """
+    if not vision_model:
+        return model
+    if image_data or has_image_attachments(attachments) or has_image_parts(messages or []):
+        return vision_model
+    return model
+
+
 def strip_image_parts(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Return a **new** message list with image blocks replaced by text
     placeholders. Use when the caller must preserve the original (e.g. to
@@ -359,7 +388,9 @@ def should_degrade_to_text(
 
 __all__ = [
     "MultimodalResult",
+    "has_image_attachments",
     "has_image_parts",
+    "model_for_image_request",
     "prepare_multimodal_messages",
     "should_degrade_to_text",
     "strip_image_parts",

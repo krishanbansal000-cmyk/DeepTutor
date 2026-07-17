@@ -29,6 +29,7 @@ class LLMConfigUpdate(TypedDict, total=False):
     """Fields allowed when cloning an LLMConfig instance."""
 
     model: str
+    vision_model: str | None
     api_key: str
     base_url: str | None
     effective_url: str | None
@@ -98,6 +99,7 @@ class LLMConfig:
 
     model: str
     api_key: str
+    vision_model: str | None = None
     base_url: str | None = None
     effective_url: str | None = None
     binding: str = "openai"
@@ -173,6 +175,7 @@ def _get_llm_config_from_resolver() -> LLMConfig:
     return LLMConfig(
         model=resolved.model,
         api_key=resolved.api_key,
+        vision_model=resolved.vision_model,
         base_url=resolved.base_url,
         effective_url=resolved.effective_url,
         binding=resolved.binding,

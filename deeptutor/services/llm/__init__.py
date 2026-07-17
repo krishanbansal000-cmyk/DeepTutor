@@ -92,7 +92,12 @@ from .factory import (
     get_provider_presets,
     stream,
 )
-from .multimodal import MultimodalResult, prepare_multimodal_messages
+from .multimodal import (
+    MultimodalResult,
+    has_image_attachments,
+    model_for_image_request,
+    prepare_multimodal_messages,
+)
 from .utils import (
     build_auth_headers,
     build_chat_url,
@@ -128,6 +133,8 @@ __all__ = [
     "requires_api_version",
     # Multimodal
     "MultimodalResult",
+    "has_image_attachments",
+    "model_for_image_request",
     "prepare_multimodal_messages",
     # Exceptions
     "LLMError",

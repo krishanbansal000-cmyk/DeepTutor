@@ -12,6 +12,10 @@ _LANGUAGE_LABELS: dict[str, str] = {
     "zh-cn": "中文（简体）",
     "zh-tw": "繁體中文",
     "en": "English",
+    "hi": "Hindi / Hinglish (हिन्दी)",
+    "bundeli": "Bundeli (बुन्देली)",
+    "awadhi": "Awadhi (अवधी)",
+    "bhojpuri": "Bhojpuri (भोजपुरी)",
     "ja": "日本語",
     "ko": "한국어",
     "es": "Español",
@@ -55,6 +59,22 @@ def language_directive(language: str | None) -> str:
             "JSON keys, or examples in this prompt are in another language. "
             "Keep proper nouns (people, products, formula symbols) in their "
             "original form."
+        )
+    if code == "hi":
+        return (
+            "\n\n[भाषा / Language] सभी learner-facing explanations को सहज Hindi/Hinglish "
+            "में लिखें। अवधारणाएँ मुख्यतः हिन्दी में समझाएँ, लेकिन programming syntax, code, "
+            "API names, equations, units, scientific terminology, citations और proper nouns को "
+            "उनके प्रचलित English रूप में ही रखें। Direct answer देने से पहले Socratic hints और "
+            "guiding questions को प्राथमिकता दें।"
+        )
+    if code in {"bundeli", "awadhi", "bhojpuri"}:
+        return (
+            f"\n\n[भाषा / Language] सभी learner-facing explanations सहज {label} में लिखें। "
+            "जहाँ किसी technical concept का regional-language शब्द अस्पष्ट हो, वहाँ सरल Hindi "
+            "का सहारा लें; programming syntax, code, API names, equations, units, scientific "
+            "terminology, citations और proper nouns को English में रखें। Direct answer देने से "
+            "पहले Socratic hints और guiding questions को प्राथमिकता दें।"
         )
     return (
         f"\n\n[Language] Write ALL reader-facing text strictly in {label}. "

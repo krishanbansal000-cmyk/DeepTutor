@@ -30,11 +30,11 @@ export default function AppearanceSettingsPage() {
         <SettingRow
           title={t("Interface language")}
           description={t(
-            "Affects the UI only. Model output language is controlled by your prompt.",
+            "Sets the interface and tutor response language. Regional modes keep code and technical terms in English.",
           )}
           control={
-            <div className="flex gap-0.5 rounded-lg bg-[var(--muted)] p-0.5">
-              {(["en", "zh"] as const).map((v) => (
+            <div className="flex flex-wrap gap-0.5 rounded-lg bg-[var(--muted)] p-0.5">
+              {(["en", "hi", "bundeli", "awadhi", "bhojpuri"] as const).map((v) => (
                 <button
                   key={v}
                   onClick={() => updateLanguage(v)}
@@ -44,7 +44,15 @@ export default function AppearanceSettingsPage() {
                       : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                   }`}
                 >
-                  {v === "en" ? t("language.english") : t("language.chinese")}
+                  {v === "en"
+                    ? t("language.english")
+                    : v === "hi"
+                      ? t("language.hindi")
+                      : v === "bundeli"
+                        ? t("language.bundeli")
+                        : v === "awadhi"
+                          ? t("language.awadhi")
+                          : t("language.bhojpuri")}
                 </button>
               ))}
             </div>
@@ -59,7 +67,7 @@ export default function AppearanceSettingsPage() {
         )}
       >
         <div className="py-4">
-          {/* Order is intentional: Default (pure-white neutral, the default
+          {/* Order is intentional: Default (beige paper, the default
               selection; theme id "snow" kept for stored preferences) →
               warm-light Cream → warm-dark Dark → cool-dark Glass. */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -82,7 +90,7 @@ export default function AppearanceSettingsPage() {
           </div>
           <p className="mt-4 text-[11.5px] leading-relaxed text-[var(--muted-foreground)]/80">
             {t(
-              "Default is a clean pure-white theme with a blue accent. Cream is warm and paper-like with a terracotta accent. Dark keeps Cream's warmth on near-black. Glass adds translucent purple panels on a deep gradient.",
+              "Default and Cream use a warm beige paper-like background. Dark keeps Cream's warmth on near-black. Glass adds translucent purple panels on a deep gradient.",
             )}
           </p>
         </div>

@@ -17,7 +17,11 @@ import httpx
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 
 from deeptutor.services.config import load_system_settings
-from deeptutor.services.llm import get_token_limit_kwargs, supports_tools
+from deeptutor.services.llm import (
+    get_token_limit_kwargs,
+    model_for_image_request,
+    supports_tools,
+)
 from deeptutor.services.llm.reasoning_params import (
     build_openai_compatible_reasoning_kwargs,
 )
@@ -38,6 +42,7 @@ class LLMClientConfig:
     model: str | None
     api_key: str | None
     base_url: str | None
+    vision_model: str | None = None
     api_version: str | None = None
     extra_headers: dict[str, str] | None = None
     reasoning_effort: str | None = None
@@ -50,25 +55,70 @@ def build_openai_client(config: LLMClientConfig) -> Any:
     if spec:
         native_adapter = _build_native_provider_adapter(config, spec)
         if native_adapter is not None:
-            return native_adapter
+            return _with_vision_routing(native_adapter, config.vision_model)
 
     http_client = None
     if load_system_settings()["disable_ssl_verify"]:
         http_client = httpx.AsyncClient(verify=False)  # nosec B501
     if config.binding == "azure_openai" or (config.binding == "openai" and config.api_version):
-        return AsyncAzureOpenAI(
+        client = AsyncAzureOpenAI(
             api_key=config.api_key or "sk-no-key-required",
             azure_endpoint=config.base_url,
             api_version=config.api_version,
             http_client=http_client,
             default_headers=default_headers,
         )
-    return AsyncOpenAI(
+        return _with_vision_routing(client, config.vision_model)
+    client = AsyncOpenAI(
         api_key=config.api_key or "sk-no-key-required",
         base_url=config.base_url or None,
         http_client=http_client,
         default_headers=default_headers,
     )
+    return _with_vision_routing(client, config.vision_model)
+
+
+def _with_vision_routing(client: Any, vision_model: str | None) -> Any:
+    if not vision_model:
+        return client
+    return _VisionRoutingClient(client, vision_model)
+
+
+class _VisionRoutingCompletions:
+    def __init__(self, completions: Any, vision_model: str) -> None:
+        self._completions = completions
+        self._vision_model = vision_model
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._completions, name)
+
+    async def create(self, **kwargs: Any) -> Any:
+        kwargs["model"] = model_for_image_request(
+            kwargs.get("model"),
+            self._vision_model,
+            messages=kwargs.get("messages"),
+        )
+        return await self._completions.create(**kwargs)
+
+
+class _VisionRoutingChat:
+    def __init__(self, chat: Any, vision_model: str) -> None:
+        self._chat = chat
+        self.completions = _VisionRoutingCompletions(chat.completions, vision_model)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._chat, name)
+
+
+class _VisionRoutingClient:
+    """Model-routing facade that preserves the configured provider client."""
+
+    def __init__(self, client: Any, vision_model: str) -> None:
+        self._client = client
+        self.chat = _VisionRoutingChat(client.chat, vision_model)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._client, name)
 
 
 def _build_native_provider_adapter(config: LLMClientConfig, spec: Any) -> Any | None:

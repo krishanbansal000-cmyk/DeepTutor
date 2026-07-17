@@ -173,3 +173,43 @@ async def test_client_get_vision_model_func_uses_factory(monkeypatch: MonkeyPatc
     assert captured["prompt"] == "hello"
     assert captured["messages"] == [{"role": "user", "content": "hi"}]
     assert captured["image_data"] == "abc123"
+
+
+@pytest.mark.asyncio
+async def test_client_routes_image_data_to_configured_vision_model(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    config = LLMConfig(
+        model="deepseek-v4-flash",
+        vision_model="mimo-v2.5",
+        api_key="key",
+        base_url="https://example.com/v1",
+        binding="custom",
+    )
+    client = LLMClient(config)
+    captured: dict[str, object] = {}
+
+    async def _fake_complete(**kwargs: object) -> str:
+        captured.update(kwargs)
+        return "ok"
+
+    monkeypatch.setattr("deeptutor.services.llm.factory.complete", _fake_complete)
+
+    await client.get_vision_model_func()("describe", image_data="abc123")
+
+    assert captured["model"] == "mimo-v2.5"
+    assert captured["base_url"] == "https://example.com/v1"
+
+
+def test_client_reports_configured_fallback_vision_support() -> None:
+    client = LLMClient(
+        LLMConfig(
+            model="deepseek-v4-flash",
+            vision_model="mimo-v2.5",
+            api_key="key",
+            base_url="https://example.com/v1",
+            binding="custom",
+        )
+    )
+
+    assert client.supports_multimodal_images() is True

@@ -9,6 +9,15 @@ def _parse_language(language: str | None) -> str:
     raw = (language or "en").strip().lower()
     if raw.startswith("zh") or raw in {"cn", "chinese"}:
         return "zh"
+    if raw.startswith("hi") or raw in {
+        "hindi",
+        "hinglish",
+        "bundeli",
+        "bundelkhandi",
+        "awadhi",
+        "bhojpuri",
+    }:
+        return "hi"
     return "en"
 
 
@@ -35,6 +44,29 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "sandbox.command_blocked": "Error: command blocked by safety guard (dangerous pattern).",
         "sandbox.disabled_for_account": "Code execution is disabled for your account.",
         "sandbox.no_backend": "no sandbox backend available",
+    },
+    "hi": {
+        "api.content_required": "सामग्री आवश्यक है",
+        "api.invalid_channels_config": "चैनल कॉन्फ़िगरेशन अमान्य है",
+        "api.partner_already_exists": "Partner '{name}' पहले से मौजूद है",
+        "api.partner_not_found": "Partner नहीं मिला",
+        "api.partner_not_found_or_not_running": "Partner नहीं मिला या चल नहीं रहा है",
+        "api.partner_not_running": "Partner चल नहीं रहा है",
+        "api.partner_stopped_start_required": "Partner रुका हुआ है। चैट से पहले उसे शुरू करें।",
+        "api.persona_already_exists": "Persona पहले से मौजूद है: {name}",
+        "api.persona_name_required": "Persona का नाम आवश्यक है",
+        "api.persona_not_found": "Persona नहीं मिला: {name}",
+        "api.soul_already_exists": "Soul '{name}' पहले से मौजूद है",
+        "api.soul_content_empty": "Custom soul की सामग्री खाली है",
+        "api.soul_library_not_found": "Library में soul '{name}' नहीं मिला",
+        "api.soul_not_found": "Soul नहीं मिला",
+        "api.tool_not_found": "Tool '{name}' नहीं मिला",
+        "mcp.configure_command_or_url": "Server {name!r}: command (stdio) या URL कॉन्फ़िगर करें।",
+        "mcp.configure_before_testing": "Test से पहले command (stdio) या URL कॉन्फ़िगर करें।",
+        "mcp.server_error": "Server {name!r}: {error}",
+        "sandbox.command_blocked": "त्रुटि: safety guard ने command रोक दी।",
+        "sandbox.disabled_for_account": "आपके account के लिए code execution बंद है।",
+        "sandbox.no_backend": "कोई sandbox backend उपलब्ध नहीं है",
     },
     "zh": {
         "api.content_required": "content 不能为空",

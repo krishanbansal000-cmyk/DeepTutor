@@ -5,7 +5,7 @@
 @layer base {
   /* ────────────────────────────────────────────────────────────────────────
      Theme palettes — four families:
-       • Default (.theme-snow) → pure-white neutral greys, blue accent
+       • Default (.theme-snow) → beige paper, blue accent
        • Cream (:root) and Dark (.dark) → warm family, terracotta accent
        • Glass (.theme-glass) → translucent purple on near-black
      Tokens that every theme must publish:
@@ -17,32 +17,29 @@
                      (replaces hardcoded bg-black/40 in components)
    ──────────────────────────────────────────────────────────────────────── */
 
-  /* Cream — near-white warm canvas. Reads as off-white at first glance;
-     the warm tint only surfaces on filled blocks (selected nav, panels)
-     and against the terracotta primary. Inspired by Claude's chrome:
-     keep bg essentially white, save the visible warmth for accents. */
+  /* Cream — warm beige paper canvas with terracotta accents. */
   :root {
     color-scheme: light;
-    --background: #fdfcf9;
-    --foreground: #1c1816;
-    --card: #ffffff;
-    --card-foreground: #1c1816;
-    --popover: #ffffff;
-    --popover-foreground: #1c1816;
-    --primary: #b0501e;
+    --background: #f3ead8;
+    --foreground: #2e261e;
+    --card: #fffaf0;
+    --card-foreground: #2e261e;
+    --popover: #fffaf0;
+    --popover-foreground: #2e261e;
+    --primary: #9a4f2c;
     --primary-foreground: #ffffff;
-    --secondary: #f5f2ea;
-    --secondary-foreground: #1c1816;
-    --muted: #f1ede2;
-    --muted-foreground: #6d645a;
-    --accent: #ece7d8;
-    --accent-foreground: #1c1816;
+    --secondary: #eadfc9;
+    --secondary-foreground: #2e261e;
+    --muted: #e8dcc4;
+    --muted-foreground: #6f6252;
+    --accent: #dfcfb0;
+    --accent-foreground: #2e261e;
     --destructive: #c53a2c;
     --destructive-foreground: #ffffff;
-    --border: #e6decc;
-    --input: #e6decc;
-    --ring: #b0501e;
-    --overlay: rgba(28, 24, 22, 0.42);
+    --border: #d8c7aa;
+    --input: #d8c7aa;
+    --ring: #9a4f2c;
+    --overlay: rgba(46, 38, 30, 0.42);
   }
 
   /* Dark — warm near-black, same terracotta family as Cream. */
@@ -70,32 +67,30 @@
     --overlay: rgba(0, 0, 0, 0.6);
   }
 
-  /* Default — pure-white neutral canvas (theme id "snow" kept for stored
-     preferences). No tint anywhere: flat #fff bg, plain grey surfaces and
-     borders. The only chroma is the blue primary on interactive accents,
-     in the spirit of Codex/ChatGPT chrome. */
+  /* Default — warm beige paper canvas (theme id "snow" kept for stored
+     preferences) with a blue primary on interactive accents. */
   .theme-snow {
     color-scheme: light;
-    --background: #ffffff;
-    --foreground: #0d0d0d;
-    --card: #ffffff;
-    --card-foreground: #0d0d0d;
-    --popover: #ffffff;
-    --popover-foreground: #0d0d0d;
-    --primary: #2563eb;
+    --background: #f3ead8;
+    --foreground: #2e261e;
+    --card: #fffaf0;
+    --card-foreground: #2e261e;
+    --popover: #fffaf0;
+    --popover-foreground: #2e261e;
+    --primary: #315f8c;
     --primary-foreground: #ffffff;
-    --secondary: #f7f7f7;
-    --secondary-foreground: #0d0d0d;
-    --muted: #f2f2f2;
-    --muted-foreground: #6e6e6e;
-    --accent: #ececec;
-    --accent-foreground: #0d0d0d;
+    --secondary: #eadfc9;
+    --secondary-foreground: #2e261e;
+    --muted: #e8dcc4;
+    --muted-foreground: #6f6252;
+    --accent: #dfcfb0;
+    --accent-foreground: #2e261e;
     --destructive: #d92d20;
     --destructive-foreground: #ffffff;
-    --border: #e5e5e5;
-    --input: #e5e5e5;
-    --ring: #2563eb;
-    --overlay: rgba(0, 0, 0, 0.4);
+    --border: #d8c7aa;
+    --input: #d8c7aa;
+    --ring: #315f8c;
+    --overlay: rgba(46, 38, 30, 0.4);
   }
 
   /* Glass — translucent purple panels on near-black. Slightly brighter

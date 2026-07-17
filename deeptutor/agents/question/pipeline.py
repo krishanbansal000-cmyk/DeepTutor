@@ -406,6 +406,7 @@ class QuestionPipeline:
         self.client_config = LLMClientConfig(
             binding=self.binding,
             model=self.model,
+            vision_model=getattr(self.llm_config, "vision_model", None),
             api_key=getattr(self.llm_config, "api_key", None),
             base_url=getattr(self.llm_config, "base_url", None),
             api_version=getattr(self.llm_config, "api_version", None),

@@ -20,8 +20,8 @@ class JinaEmbeddingAdapter(BaseEmbeddingAdapter):
             "multimodal": False,
         },
         "jina-embeddings-v4": {
-            "default": 1024,
-            "dimensions": [32, 64, 128, 256, 512, 768, 1024],
+            "default": 2048,
+            "dimensions": [128, 256, 512, 1024, 2048],
             "multimodal": True,
         },
     }
@@ -62,18 +62,26 @@ class JinaEmbeddingAdapter(BaseEmbeddingAdapter):
         }
         headers.update({str(k): str(v) for k, v in self.extra_headers.items()})
 
-        # Jina v4 accepts mixed `["text", "https://image.url", "data:..."]`
-        # arrays in `input`; v3 is text-only. Treat `contents` as advisory:
-        # if set, flatten each {"text"|"image"|"video": value} to its value.
+        # Jina v4 accepts mixed object arrays such as
+        # [{"text": "..."}, {"image": "URL-or-raw-base64"}].  A data URI is
+        # convenient for the provider-neutral client contract, but Jina expects
+        # raw base64 in the image field, so strip the URI header here.
         if request.contents:
             if not self._supports_multimodal(request.model or self.model):
                 raise ValueError(
                     f"Jina model '{request.model or self.model}' does not support "
                     "multimodal `contents`."
                 )
-            input_payload = [
-                next(iter(item.values())) for item in request.contents if isinstance(item, dict)
-            ]
+            input_payload = []
+            for item in request.contents:
+                if not isinstance(item, dict) or not item:
+                    continue
+                key, value = next(iter(item.items()))
+                if key == "image" and isinstance(value, str) and value.startswith("data:"):
+                    _, separator, encoded = value.partition(",")
+                    if separator:
+                        value = encoded
+                input_payload.append({key: value})
         else:
             input_payload = request.texts
 
@@ -100,6 +108,9 @@ class JinaEmbeddingAdapter(BaseEmbeddingAdapter):
 
         if request.late_chunking:
             payload["late_chunking"] = True
+
+        if request.truncate is not None:
+            payload["truncate"] = bool(request.truncate)
 
         url = self.base_url
 

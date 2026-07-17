@@ -1,6 +1,9 @@
 {
   "language.english": "English",
-  "language.chinese": "中文",
+  "language.hindi": "हिन्दी / Hinglish",
+  "language.bundeli": "Bundeli / बुन्देली",
+  "language.awadhi": "Awadhi / अवधी",
+  "language.bhojpuri": "Bhojpuri / भोजपुरी",
   "Start": "开始",
   "Learn": "学习",
   "Research": "研究",

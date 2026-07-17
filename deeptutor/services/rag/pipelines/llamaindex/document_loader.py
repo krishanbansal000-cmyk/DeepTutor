@@ -15,7 +15,9 @@ import base64
 from dataclasses import dataclass
 import logging
 import mimetypes
+import os
 from pathlib import Path
+import re
 from typing import Any, Iterable
 
 from llama_index.core import Document
@@ -51,6 +53,7 @@ class _ImageSource:
 
     path: Path
     origin: Path
+    description_hint: str = ""
 
 
 class LlamaIndexDocumentLoader:
@@ -109,7 +112,11 @@ class LlamaIndexDocumentLoader:
             return "", []
 
         text = parsed.markdown.strip() or self._text_from_blocks(parsed.blocks)
-        images = self._collect_asset_images(parsed.asset_dir, origin=file_path)
+        images = self._collect_asset_images(
+            parsed.asset_dir,
+            origin=file_path,
+            markdown=text,
+        )
         return text, images
 
     @staticmethod
@@ -124,7 +131,13 @@ class LlamaIndexDocumentLoader:
         ]
         return "\n\n".join(part for part in parts if part)
 
-    def _collect_asset_images(self, asset_dir: Path | None, *, origin: Path) -> list[_ImageSource]:
+    def _collect_asset_images(
+        self,
+        asset_dir: Path | None,
+        *,
+        origin: Path,
+        markdown: str = "",
+    ) -> list[_ImageSource]:
         """Gather images the parse engine extracted into ``asset_dir``.
 
         Engines that don't extract images (text-only, markitdown) leave
@@ -133,8 +146,13 @@ class LlamaIndexDocumentLoader:
         """
         if not asset_dir or not Path(asset_dir).is_dir():
             return []
+        hints = self._image_context_hints(markdown)
         images = [
-            _ImageSource(path=child, origin=origin)
+            _ImageSource(
+                path=child,
+                origin=origin,
+                description_hint=hints.get(child.name, ""),
+            )
             for child in sorted(Path(asset_dir).iterdir())
             if child.is_file() and child.suffix.lower() in FileTypeRouter.IMAGE_EXTENSIONS
         ]
@@ -144,61 +162,109 @@ class LlamaIndexDocumentLoader:
             )
         return images
 
+    @staticmethod
+    def _image_context_hints(markdown: str) -> dict[str, str]:
+        """Collect nearby document text for each extracted Markdown image.
+
+        PyMuPDF4LLM preserves image links in reading order.  Capturing a small
+        window around each link gives a useful, source-grounded caption when
+        the configured answer LLM is text-only.  The actual image still gets a
+        visual embedding; this hint only makes retrieved results intelligible
+        to a text-only response model.
+        """
+        if not markdown:
+            return {}
+
+        image_re = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+        lines = markdown.splitlines()
+        hints: dict[str, str] = {}
+        for index, line in enumerate(lines):
+            for match in image_re.finditer(line):
+                target = match.group(2).strip().split(maxsplit=1)[0].strip("<>\"")
+                name = os.path.basename(target.replace("\\", "/"))
+                if not name:
+                    continue
+
+                parts: list[str] = []
+                alt = match.group(1).strip()
+                if alt:
+                    parts.append(alt)
+                for nearby in lines[max(0, index - 2) : min(len(lines), index + 4)]:
+                    cleaned = image_re.sub("", nearby)
+                    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+                    cleaned = re.sub(r"^[#>*+\-\s]+", "", cleaned).strip()
+                    if cleaned:
+                        parts.append(cleaned)
+
+                # Keep descriptions compact enough for source cards and BM25.
+                hint = " ".join(dict.fromkeys(parts))
+                hint = re.sub(r"\s+", " ", hint).strip()
+                if hint:
+                    hints[name] = hint[:700]
+        return hints
+
     async def _load_image_nodes(self, sources: list[_ImageSource]) -> list[ImageNode]:
         embedding_client = get_embedding_client()
-        llm_client = get_llm_client()
-
-        unsupported_reasons = []
         if not embedding_client.supports_multimodal_contents():
-            unsupported_reasons.append(
-                "embedding provider/model does not support multimodal contents "
-                f"(binding={embedding_client.config.binding}, "
-                f"model={embedding_client.config.model})"
-            )
-        if not llm_client.supports_multimodal_images():
-            unsupported_reasons.append(
-                "LLM provider/model does not support multimodal image input "
-                f"(binding={llm_client.config.binding}, model={llm_client.config.model})"
-            )
-        if unsupported_reasons:
-            reason_text = "; ".join(unsupported_reasons)
             for source in sources:
                 self.logger.warning(
-                    "Skipped image because image indexing requires both "
-                    f"multimodal embedding and multimodal LLM support; {reason_text}: "
+                    "Skipped image because visual indexing requires a multimodal "
+                    "embedding provider/model "
+                    f"(binding={embedding_client.config.binding}, "
+                    f"model={embedding_client.config.model}): "
                     f"{source.path.name}"
                 )
             return []
 
+        llm_client = get_llm_client()
+        use_vision_descriptions = llm_client.supports_multimodal_images()
+        if not use_vision_descriptions:
+            self.logger.info(
+                "The configured LLM is text-only; extracted images will still receive "
+                "visual embeddings, with nearby document text used as their descriptions"
+            )
+
         embedded: list[_ImageSource] = []
         descriptions: list[str] = []
+        description_sources: list[str] = []
         contents = []
         for source in sources:
             try:
                 image_payload = self._load_image_payload(source.path)
-                description = await self._describe_image(
-                    source.path,
-                    image_payload["base64"],
-                    image_payload["mimetype"],
-                )
+                description = ""
+                description_source = "document_context"
+                if use_vision_descriptions:
+                    try:
+                        description = await self._describe_image(
+                            source.path,
+                            image_payload["base64"],
+                            image_payload["mimetype"],
+                        )
+                        description_source = "vision_llm"
+                    except Exception as exc:
+                        self.logger.warning(
+                            "Could not describe image %s with the configured vision LLM; "
+                            "using source context instead: %s",
+                            source.path.name,
+                            exc,
+                        )
                 if not description:
-                    self.logger.warning(
-                        "Skipped image because the configured multimodal LLM "
-                        f"returned no description: {source.path.name}"
+                    description = self._fallback_image_description(source)
+                    description_source = (
+                        "document_context" if source.description_hint else "source_fallback"
                     )
+                if not description:
                     continue
                 contents.append({"image": image_payload["data_uri"]})
                 embedded.append(source)
                 descriptions.append(description)
+                description_sources.append(description_source)
             except OSError as exc:
                 self.logger.error(f"Failed to read image {source.path.name}: {exc}")
             except Exception as exc:
                 self.logger.error(
-                    "Failed to describe image %s with configured multimodal LLM "
-                    "(binding=%s, model=%s): %s",
+                    "Failed to prepare image %s for multimodal embedding: %s",
                     source.path.name,
-                    llm_client.config.binding,
-                    llm_client.config.model,
                     exc,
                 )
 
@@ -206,7 +272,10 @@ class LlamaIndexDocumentLoader:
             return []
 
         try:
-            embeddings = await embedding_client.embed_contents(contents)
+            embeddings = await embedding_client.embed_contents(
+                contents,
+                input_type="search_document",
+            )
         except Exception as exc:
             self.logger.error(
                 "Failed to embed image contents with configured multimodal embedding "
@@ -217,7 +286,12 @@ class LlamaIndexDocumentLoader:
             )
             return []
         nodes: list[ImageNode] = []
-        for source, description, embedding in zip(embedded, descriptions, embeddings):
+        for source, description, description_source, embedding in zip(
+            embedded,
+            descriptions,
+            description_sources,
+            embeddings,
+        ):
             mimetype = mimetypes.guess_type(source.path.name)[0] or "application/octet-stream"
             nodes.append(
                 ImageNode(
@@ -229,12 +303,22 @@ class LlamaIndexDocumentLoader:
                         "file_path": str(source.origin),
                         "content_type": "image",
                         "image_description": description,
+                        "image_description_source": description_source,
                     },
                     embedding=embedding,
                 )
             )
             self.logger.info(f"Loaded image: {source.path.name} ({len(embedding)}D vector)")
         return nodes
+
+    @staticmethod
+    def _fallback_image_description(source: _ImageSource) -> str:
+        if source.description_hint:
+            return source.description_hint
+        return (
+            f"Visual extracted from {source.origin.name}. "
+            f"Asset name: {source.path.name}."
+        )
 
     async def _describe_image(self, file_path: Path, image_base64: str, mimetype: str) -> str:
         llm_client = get_llm_client()

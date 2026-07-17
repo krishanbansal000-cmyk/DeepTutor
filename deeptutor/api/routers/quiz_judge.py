@@ -275,11 +275,12 @@ async def websocket_quiz_judge(websocket: WebSocket):
         return
 
     requested_language = (data.get("language") or "").strip().lower()
-    if requested_language not in ("zh", "en"):
+    supported_languages = ("zh", "en", "hi", "bundeli", "awadhi", "bhojpuri")
+    if requested_language not in supported_languages:
         requested_language = get_ui_language(
             default=_config.get("system", {}).get("language", "en")
         )
-        if requested_language not in ("zh", "en"):
+        if requested_language not in supported_languages:
             requested_language = "en"
 
     user_answer = data.get("user_answer") or ""
@@ -336,6 +337,10 @@ async def websocket_quiz_judge(websocket: WebSocket):
 
     options_value = data.get("options") if isinstance(data.get("options"), dict) else None
     system_prompt = _JUDGE_SYSTEM_PROMPTS.get(requested_language, _JUDGE_SYSTEM_PROMPTS["en"])
+    if requested_language in {"hi", "bundeli", "awadhi", "bhojpuri"}:
+        from deeptutor.services.prompt.language import append_language_directive
+
+        system_prompt = append_language_directive(system_prompt, requested_language)
     user_prompt = _build_judge_user_prompt(
         language=requested_language,
         question=question_text,

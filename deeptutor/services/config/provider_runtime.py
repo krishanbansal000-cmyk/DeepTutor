@@ -444,6 +444,7 @@ class ResolvedLLMConfig:
     model: str
     provider_name: str
     provider_mode: str
+    vision_model: str | None = None
     binding_hint: str | None = None
     binding: str = "openai"
     api_key: str = ""
@@ -638,6 +639,9 @@ def resolve_llm_runtime_config(
     active_api_base = _as_str((profile or {}).get("base_url"))
     active_api_version = _as_str((profile or {}).get("api_version"))
     reasoning_effort = _as_str((model or {}).get("reasoning_effort")) or None
+    vision_model = _as_str((model or {}).get("vision_model")) or _as_str(
+        (profile or {}).get("vision_model")
+    ) or None
     active_extra_headers = _to_headers((profile or {}).get("extra_headers"))
     context_window = _coerce_optional_int((model or {}).get("context_window"))
     if context_window is None:
@@ -664,6 +668,7 @@ def resolve_llm_runtime_config(
 
     return ResolvedLLMConfig(
         model=resolved_model,
+        vision_model=vision_model,
         provider_name=spec.name,
         provider_mode=spec.mode,
         binding_hint=binding_hint,

@@ -22,6 +22,7 @@ from deeptutor.services.llm import complete as llm_complete
 from deeptutor.services.llm import (
     get_llm_config,
     get_token_limit_kwargs,
+    model_for_image_request,
     prepare_multimodal_messages,
     supports_response_format,
 )
@@ -380,7 +381,12 @@ class BaseAgent(ABC):
         Returns:
             LLM response text
         """
-        model = model or self.get_model()
+        model = model_for_image_request(
+            model or self.get_model(),
+            getattr(get_llm_config(), "vision_model", None),
+            messages=messages,
+            attachments=attachments,
+        )
         temperature = temperature if temperature is not None else self.get_temperature()
         max_tokens = max_tokens if max_tokens is not None else self.get_max_tokens()
         max_retries = self.get_max_retries()
@@ -541,7 +547,12 @@ class BaseAgent(ABC):
         Yields:
             Response chunks as strings
         """
-        model = model or self.get_model()
+        model = model_for_image_request(
+            model or self.get_model(),
+            getattr(get_llm_config(), "vision_model", None),
+            messages=messages,
+            attachments=attachments,
+        )
         temperature = temperature if temperature is not None else self.get_temperature()
         max_tokens = max_tokens if max_tokens is not None else self.get_max_tokens()
         max_retries = self.get_max_retries()

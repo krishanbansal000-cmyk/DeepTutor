@@ -13,7 +13,7 @@ from typing import Any
 from deeptutor.services.path_service import get_path_service
 
 DEFAULT_UI_SETTINGS: dict[str, Any] = {
-    # "snow" is the pure-white neutral theme, shown as "Default" in the UI.
+    # "snow" is the beige paper theme, shown as "Default" in the UI.
     "theme": "snow",
     "language": "en",
 }
@@ -31,6 +31,10 @@ def _normalize_language(language: Any, default: str = "en") -> str:
     Normalize language codes:
     - en/english -> en
     - zh/chinese/cn -> zh
+    - hi/hindi/hinglish -> hi
+    - bundeli/bundelkhandi -> bundeli
+    - awadhi -> awadhi
+    - bhojpuri -> bhojpuri
     """
     if language is None or language == "":
         language = default
@@ -40,7 +44,15 @@ def _normalize_language(language: Any, default: str = "en") -> str:
         if s in {"en", "english"}:
             return "en"
         if s in {"zh", "chinese", "cn"}:
-            return "zh"
+            return "en"
+        if s in {"hi", "hindi", "hinglish"}:
+            return "hi"
+        if s in {"bundeli", "bundelkhandi"}:
+            return "bundeli"
+        if s == "awadhi":
+            return "awadhi"
+        if s == "bhojpuri":
+            return "bhojpuri"
 
     # Fall back to default
     if isinstance(default, str):

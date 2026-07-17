@@ -55,7 +55,7 @@ DEFAULT_SIDEBAR_NAV_ORDER = {
 }
 
 DEFAULT_UI_SETTINGS = {
-    # "snow" is the pure-white neutral theme, shown as "Default" in the UI.
+    # "snow" is the beige paper theme, shown as "Default" in the UI.
     "theme": "snow",
     "language": "en",
     "sidebar_description": "✨ Data Intelligence Lab @ HKU",
@@ -88,7 +88,7 @@ class SidebarNavOrder(BaseModel):
 
 class UISettings(BaseModel):
     theme: Literal["light", "dark", "glass", "snow"] = "snow"
-    language: Literal["zh", "en"] = "en"
+    language: Literal["en", "hi", "bundeli", "awadhi", "bhojpuri"] = "en"
     sidebar_description: Optional[str] = None
     sidebar_nav_order: Optional[SidebarNavOrder] = None
 
@@ -106,7 +106,7 @@ class ThemeUpdate(BaseModel):
 
 
 class LanguageUpdate(BaseModel):
-    language: Literal["zh", "en"]
+    language: Literal["en", "hi", "bundeli", "awadhi", "bhojpuri"]
 
 
 class SidebarDescriptionUpdate(BaseModel):

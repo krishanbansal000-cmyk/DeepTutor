@@ -63,7 +63,13 @@ class EmbeddingClient:
             f"(model: {self.config.model}, dimensions: {self.config.dim})"
         )
 
-    async def embed(self, texts: List[str], progress_callback=None) -> List[List[float]]:
+    async def embed(
+        self,
+        texts: List[str],
+        progress_callback=None,
+        *,
+        input_type: Optional[str] = None,
+    ) -> List[List[float]]:
         if not texts:
             return []
 
@@ -92,6 +98,7 @@ class EmbeddingClient:
                 texts=batch,
                 model=self.config.model,
                 dimensions=self.config.dim or None,
+                input_type=input_type,
             )
             try:
                 response = await self.adapter.embed(request)
@@ -168,6 +175,7 @@ class EmbeddingClient:
         contents: List[Dict[str, Any]],
         *,
         progress_callback=None,
+        input_type: Optional[str] = None,
     ) -> List[List[float]]:
         """Embed provider-agnostic multimodal content items.
 
@@ -195,6 +203,7 @@ class EmbeddingClient:
                 texts=[],
                 model=self.config.model,
                 dimensions=self.config.dim or None,
+                input_type=input_type,
                 contents=batch,
                 enable_fusion=False,
             )

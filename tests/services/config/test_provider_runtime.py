@@ -302,6 +302,34 @@ def test_llm_reasoning_effort_resolves_from_catalog() -> None:
     assert resolved.reasoning_effort == "high"
 
 
+def test_llm_vision_model_resolves_from_active_model() -> None:
+    catalog = _build_catalog(
+        llm_profile={
+            "id": "llm-p",
+            "name": "OpenCode Go",
+            "binding": "custom",
+            "base_url": "https://opencode.ai/zen/go/v1",
+            "api_key": "sk-test",
+            "api_version": "",
+            "extra_headers": {},
+            "models": [
+                {
+                    "id": "llm-m",
+                    "name": "DeepSeek V4 Flash",
+                    "model": "deepseek-v4-flash",
+                    "vision_model": "mimo-v2.5",
+                }
+            ],
+        }
+    )
+
+    resolved = resolve_llm_runtime_config(catalog=catalog)
+
+    assert resolved.model == "deepseek-v4-flash"
+    assert resolved.vision_model == "mimo-v2.5"
+    assert resolved.effective_url == "https://opencode.ai/zen/go/v1"
+
+
 def test_search_fallback_to_duckduckgo_without_key() -> None:
     catalog = _build_catalog(
         search_profile={

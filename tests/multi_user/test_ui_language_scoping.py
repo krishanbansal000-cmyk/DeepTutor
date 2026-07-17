@@ -21,6 +21,8 @@ def test_get_ui_language_reads_per_user_interface_json(mu_isolated_root, as_user
         mu_isolated_root / "data" / "users" / "u_alice" / "user" / "settings" / "interface.json"
     )
     alice_settings.parent.mkdir(parents=True, exist_ok=True)
+    # Legacy Chinese preferences are intentionally migrated to English because
+    # the UP-focused interface no longer exposes Chinese as a visible option.
     alice_settings.write_text(json.dumps({"theme": "dark", "language": "zh"}))
 
     with as_user("u_admin", role="admin"):
@@ -28,7 +30,7 @@ def test_get_ui_language_reads_per_user_interface_json(mu_isolated_root, as_user
         assert get_ui_settings()["theme"] == "light"
 
     with as_user("u_alice", role="user"):
-        assert get_ui_language() == "zh"
+        assert get_ui_language() == "en"
         assert get_ui_settings()["theme"] == "dark"
 
 

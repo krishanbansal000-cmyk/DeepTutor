@@ -54,6 +54,7 @@ import {
 } from "@/lib/notebook-api";
 import { recordQuizResults } from "@/lib/session-api";
 import { apiUrl } from "@/lib/api";
+import { normalizeLanguage } from "@/i18n";
 
 /** Resolve a possibly-relative AttachmentStore URL to an absolute one so
  *  ``<img src>`` works regardless of the API/frontend port pairing. */
@@ -634,7 +635,7 @@ export default function QuizViewer({
     }));
     setAnswerViews((prev) => ({ ...prev, [idx]: "judgment" }));
 
-    const judgeLanguage: "zh" | "en" = language === "zh" ? "zh" : "en";
+    const judgeLanguage = normalizeLanguage(language);
 
     const handle = startQuizJudge(
       {

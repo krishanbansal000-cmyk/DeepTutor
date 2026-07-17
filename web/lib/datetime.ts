@@ -1,7 +1,8 @@
-export type Language = "en" | "zh";
+export type Language = "en" | "zh" | "hi" | "bundeli" | "awadhi" | "bhojpuri";
 
 export function getLocale(lang: Language): string {
-  return lang === "zh" ? "zh-CN" : "en-US";
+  if (["hi", "bundeli", "awadhi", "bhojpuri"].includes(lang)) return "hi-IN";
+  return "en-US";
 }
 
 export function formatDate(

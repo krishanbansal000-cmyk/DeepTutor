@@ -120,6 +120,60 @@ async def test_jina_v3_rejects_multimodal_contents() -> None:
 
 
 @pytest.mark.asyncio
+async def test_jina_v4_preserves_content_objects_and_strips_data_uri(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_post(self: httpx.AsyncClient, url: str, **kwargs: Any) -> httpx.Response:
+        captured["json"] = kwargs.get("json")
+        request = httpx.Request("POST", url)
+        return httpx.Response(
+            status_code=200,
+            json={
+                "data": [
+                    {"embedding": [0.1, 0.2]},
+                    {"embedding": [0.3, 0.4]},
+                ],
+                "model": "jina-embeddings-v4",
+            },
+            request=request,
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    adapter = JinaEmbeddingAdapter(
+        {
+            "api_key": "jina-test",
+            "base_url": "https://api.jina.ai/v1/embeddings",
+            "model": "jina-embeddings-v4",
+            "dimensions": 1024,
+            "request_timeout": 5,
+        }
+    )
+    await adapter.embed(
+        EmbeddingRequest(
+            texts=[],
+            model="jina-embeddings-v4",
+            dimensions=1024,
+            input_type="search_document",
+            contents=[
+                {"text": "hello"},
+                {"image": "data:image/png;base64,QUJD"},
+            ],
+        )
+    )
+
+    assert captured["json"]["input"] == [
+        {"text": "hello"},
+        {"image": "QUJD"},
+    ]
+    assert captured["json"]["task"] == "retrieval.passage"
+    assert captured["json"]["dimensions"] == 1024
+    assert captured["json"]["truncate"] is True
+
+
+@pytest.mark.asyncio
 async def test_cohere_v2_translates_contents_to_inputs(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, Any] = {}
 

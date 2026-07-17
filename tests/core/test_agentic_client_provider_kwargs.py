@@ -5,6 +5,7 @@ import pytest
 from deeptutor.core.agentic.client import (
     LLMClientConfig,
     _ProviderOpenAIAdapter,
+    _VisionRoutingClient,
     build_completion_kwargs,
     build_openai_client,
     can_use_native_tool_calling,
@@ -23,6 +24,43 @@ def test_agentic_kwargs_disable_deepseek_flash_thinking_by_default() -> None:
     assert kwargs["max_tokens"] == 1024
     assert "reasoning_effort" not in kwargs
     assert kwargs["extra_body"] == {"thinking": {"type": "disabled"}}
+
+
+@pytest.mark.asyncio
+async def test_agentic_client_routes_only_image_requests_to_vision_model() -> None:
+    captured: list[dict] = []
+
+    class FakeCompletions:
+        async def create(self, **kwargs):
+            captured.append(kwargs)
+            return "ok"
+
+    class FakeChat:
+        completions = FakeCompletions()
+
+    class FakeClient:
+        chat = FakeChat()
+
+    client = _VisionRoutingClient(FakeClient(), "mimo-v2.5")
+    await client.chat.completions.create(
+        model="deepseek-v4-flash",
+        messages=[{"role": "user", "content": "hello"}],
+    )
+    await client.chat.completions.create(
+        model="deepseek-v4-flash",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "describe"},
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,a"}},
+                ],
+            }
+        ],
+    )
+
+    assert captured[0]["model"] == "deepseek-v4-flash"
+    assert captured[1]["model"] == "mimo-v2.5"
 
 
 def test_agentic_kwargs_enable_deepseek_pro_thinking_by_default() -> None:

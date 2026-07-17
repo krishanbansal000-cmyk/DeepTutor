@@ -23,6 +23,10 @@ class PromptManager:
     LANGUAGE_FALLBACKS = {
         "zh": ["zh", "cn", "en"],
         "en": ["en", "zh", "cn"],
+        "hi": ["hi", "en"],
+        "bundeli": ["hi", "en"],
+        "awadhi": ["hi", "en"],
+        "bhojpuri": ["hi", "en"],
     }
 
     # Supported modules

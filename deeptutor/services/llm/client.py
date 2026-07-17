@@ -14,6 +14,7 @@ from typing import Any, cast
 
 from .capabilities import supports_vision
 from .config import LLMConfig, get_llm_config
+from .multimodal import model_for_image_request
 from .utils import sanitize_url
 
 
@@ -83,10 +84,16 @@ class LLMClient:
 
         factory_complete = cast(Callable[..., Awaitable[str]], factory.complete)
         messages = history or None
+        request_model = model_for_image_request(
+            self.config.model,
+            self.config.vision_model,
+            messages=cast(list[dict[str, Any]] | None, messages),
+            image_data=cast(str | None, kwargs.get("image_data")),
+        )
         return await factory_complete(
             prompt=prompt,
             system_prompt=system_prompt or "You are a helpful assistant.",
-            model=self.config.model,
+            model=request_model,
             api_key=self.config.api_key,
             base_url=self.config.base_url,
             api_version=getattr(self.config, "api_version", None),
@@ -142,7 +149,8 @@ class LLMClient:
 
     def supports_multimodal_images(self) -> bool:
         """Return whether the configured LLM can accept image input."""
-        return supports_vision(getattr(self.config, "binding", "openai"), self.config.model)
+        model = self.config.vision_model or self.config.model
+        return supports_vision(getattr(self.config, "binding", "openai"), model)
 
     def _build_factory_model_func(self, allow_multimodal: bool) -> Callable[..., object]:
         """Build adapter callables on top of the unified factory.complete API."""
@@ -196,11 +204,18 @@ class LLMClient:
             if allow_multimodal and image_data is not None:
                 payload_kwargs["image_data"] = image_data
 
+            request_model = model_for_image_request(
+                self.config.model,
+                self.config.vision_model,
+                messages=resolved_messages,
+                image_data=image_data if allow_multimodal else None,
+            )
+
             factory_complete = cast(Callable[..., Awaitable[str]], factory.complete)
             return await factory_complete(
                 prompt=prompt,
                 system_prompt=default_system_prompt,
-                model=self.config.model,
+                model=request_model,
                 api_key=self.config.api_key,
                 base_url=sanitize_url(self.config.base_url) if self.config.base_url else None,
                 api_version=getattr(self.config, "api_version", None),
