@@ -172,6 +172,8 @@
     @apply antialiased;
     background: var(--background);
     color: var(--foreground);
+    font-size: 16px;
+    line-height: 1.6;
   }
 
   button,
@@ -183,6 +185,12 @@
 
   summary::-webkit-details-marker {
     display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .workspace-shell:has(> .student-mobile-nav) > main {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
 }
 

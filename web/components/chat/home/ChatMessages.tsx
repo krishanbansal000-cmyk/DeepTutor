@@ -64,6 +64,8 @@ import { AssistantActivity } from "./TracePanels";
 import ChatSourceCitations from "./ChatSourceCitations";
 import { agentGlyph } from "@/components/agents/agent-icons";
 import { useConnectedAgentKinds } from "@/hooks/useConnectedAgentKinds";
+import { useAppShell } from "@/context/AppShellContext";
+import TeachingBoardButton from "@/components/student/TeachingBoard";
 
 const MathAnimatorViewer = dynamic(
   () => import("@/components/math-animator/MathAnimatorViewer"),
@@ -1159,6 +1161,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   ) => void;
 }) {
   const { t } = useTranslation();
+  const { experienceMode } = useAppShell();
   // Visible path: when no branching has happened the result is identical
   // to the input. After an edit, sibling branches are filtered out so the
   // UI shows exactly one continuous thread, with arrow nav exposed on the
@@ -1359,7 +1362,7 @@ export const ChatMessageList = memo(function ChatMessageList({
             : null;
         const showDelete = deletableTurnUserId != null;
 
-        const costSummary = (() => {
+        const costSummary = experienceMode === "student" ? null : (() => {
           if (!msgDone) return null;
           const resultEv = msg.events?.find((e) => e.type === "result");
           if (!resultEv) return null;
@@ -1457,6 +1460,9 @@ export const ChatMessageList = memo(function ChatMessageList({
                           isLastAssistant && freshlyCompletedIndex === i
                         }
                       />
+                    )}
+                    {showActions && experienceMode === "student" && (
+                      <TeachingBoardButton content={msg.content} />
                     )}
                     {showActions && showRegenerate && (
                       <RoughActionButton

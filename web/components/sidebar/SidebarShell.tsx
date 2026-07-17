@@ -32,9 +32,9 @@ import { useCapabilityAccess } from "@/components/access/CapabilityAccessContext
 import type { Capability } from "@/lib/capability-routes";
 import {
   isAdvancedExperience,
-  knowledgeLabel,
   primaryNavVisible,
   secondaryNavVisible,
+  workspaceLabel,
 } from "@/lib/experience-mode";
 
 interface NavEntry {
@@ -164,7 +164,7 @@ export function SidebarShell({
     secondaryNavVisible(experienceMode, item.href),
   );
   const labelFor = (item: NavEntry) =>
-    item.href === "/knowledge" ? knowledgeLabel(experienceMode) : item.label;
+    workspaceLabel(experienceMode, item.href, item.label);
 
   const navLocked = (item: NavEntry) =>
     item.requires ? !has(item.requires) : false;
@@ -206,7 +206,11 @@ export function SidebarShell({
   /* ---- Collapsed state ---- */
   if (collapsed) {
     return (
-      <aside className="group/sb relative flex h-screen w-[60px] shrink-0 flex-col items-center bg-[var(--secondary)] py-3 transition-all duration-200">
+      <aside
+        className={`group/sb relative h-screen w-[60px] shrink-0 flex-col items-center bg-[var(--secondary)] py-3 transition-all duration-200 ${
+          experienceMode === "student" ? "hidden md:flex" : "flex"
+        }`}
+      >
         {/* Header: logo + collapse toggle (toggle replaces logo on hover) */}
         <div className="relative mb-2 flex h-9 w-9 items-center justify-center">
           <Link
@@ -339,7 +343,11 @@ export function SidebarShell({
 
   /* ---- Expanded state ---- */
   return (
-    <aside className="flex w-[220px] h-screen shrink-0 flex-col bg-[var(--secondary)] transition-all duration-200">
+    <aside
+      className={`h-screen w-[220px] shrink-0 flex-col bg-[var(--secondary)] transition-all duration-200 ${
+        experienceMode === "student" ? "hidden md:flex" : "flex"
+      }`}
+    >
       {/* Header: logo + collapse toggle */}
       <div className="flex h-14 items-center justify-between px-4">
         <Link href="/" className="group flex items-center gap-1.5">

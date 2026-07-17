@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import {
   BarChart3,
@@ -35,6 +35,9 @@ import type { SelectedHistorySession } from "@/components/chat/HistorySessionPic
 import type { SelectedQuestionEntry } from "@/components/chat/QuestionBankPicker";
 import ChatComposer from "@/components/chat/home/ChatComposer";
 import { ChatMessageList } from "@/components/chat/home/ChatMessages";
+import StudentTutorWelcome, {
+  StudentCourseStrip,
+} from "@/components/student/StudentTutorWelcome";
 import SessionLoadingView from "@/components/chat/home/SessionLoadingView";
 // Imported eagerly so the drawer shell is always mounted off-screen —
 // clicking a chip becomes a single CSS class flip, no chunk fetch + double
@@ -316,6 +319,7 @@ function getCapability(value: string | null): CapabilityDef {
 export default function ChatPage() {
   const params = useParams<{ sessionId?: string[] }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useTranslation();
   const sessionIdParam = params.sessionId?.[0] ?? null;
   const {
@@ -642,6 +646,30 @@ export default function ChatPage() {
     }
   }, [capabilityNeedsConfig, ensureActivityPanelOpen]);
   const hasMessages = state.messages.length > 0;
+  const isStudentExperience = experienceMode === "student";
+  const practiceRequested = searchParams.get("practice") === "1";
+
+  // The mobile Practice destination opens the ordinary tutor and prepares a
+  // natural one-question-at-a-time request. It deliberately does not expose a
+  // capability or configuration screen to the student.
+  useEffect(() => {
+    if (!isStudentExperience || !practiceRequested) return;
+    setCapability(null);
+    const timer = window.setTimeout(() => {
+      handlePrefillComposer(
+        t("Quiz me on this topic one question at a time: "),
+      );
+      router.replace("/home", { scroll: false });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [
+    handlePrefillComposer,
+    isStudentExperience,
+    practiceRequested,
+    router,
+    setCapability,
+    t,
+  ]);
   // Time-of-day greeting: seeded once on mount from the user's local clock so
   // the heading stays stable while they're on the page. State (not useMemo)
   // because the random pick would otherwise mismatch SSR ↔ client hydration.
@@ -1818,6 +1846,7 @@ export default function ChatPage() {
           data-viewer-open={viewerPanelOpen ? "true" : "false"}
           className="chat-preview-shell flex h-full flex-col overflow-hidden bg-[var(--background)]"
         >
+          {(hasMessages || !isStudentExperience) && (
           <div className="mx-auto flex w-full max-w-[960px] flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-6 pt-3 pb-0">
             <div className="group/title min-w-0 flex flex-1 items-center gap-2">
               {sessionTitleEditing ? (
@@ -1861,7 +1890,7 @@ export default function ChatPage() {
                 </span>
               ) : null}
             </div>
-            <div className="flex shrink-0 items-center gap-0.5">
+            {!isStudentExperience && <div className="flex shrink-0 items-center gap-0.5">
               <HeaderActionButton
                 onClick={() => setShowSaveModal(true)}
                 disabled={!chatSavePayload}
@@ -1882,27 +1911,39 @@ export default function ChatPage() {
                 label={t("Activity")}
                 title={t("Session activity, attachments & previews")}
               />
-            </div>
+            </div>}
           </div>
+          )}
           <div className="mx-auto flex w-full max-w-[960px] flex-1 min-h-0 flex-col overflow-hidden px-6">
             {sessionLoading ? (
               <SessionLoadingView onCancel={cancelSessionLoad} />
             ) : !hasMessages ? (
-              <div className="flex flex-1 min-h-0 flex-col items-center justify-end pb-14 animate-fade-in">
-                <div className="flex items-center justify-center gap-4">
-                  <img
-                    src="/logo_black.png"
-                    alt="Drona"
-                    width={40}
-                    height={40}
-                    className="h-10 w-10 select-none"
-                    draggable={false}
+              isStudentExperience ? (
+                <div className="min-h-0 flex-1 overflow-y-auto animate-fade-in">
+                  <StudentTutorWelcome
+                    materials={kbOptions}
+                    selectedMaterials={selectedKbOnly}
+                    onToggleMaterial={handleToggleKB}
+                    onPrompt={handlePrefillComposer}
                   />
-                  <h1 className="font-serif text-[40px] font-medium leading-[1.1] tracking-[-0.015em] text-[var(--foreground)]">
-                    {t(welcomeGreeting)}
-                  </h1>
                 </div>
-              </div>
+              ) : (
+                <div className="flex flex-1 min-h-0 flex-col items-center justify-end pb-14 animate-fade-in">
+                  <div className="flex items-center justify-center gap-4">
+                    <img
+                      src="/logo_black.png"
+                      alt="Drona"
+                      width={40}
+                      height={40}
+                      className="h-10 w-10 select-none"
+                      draggable={false}
+                    />
+                    <h1 className="font-serif text-[40px] font-medium leading-[1.1] tracking-[-0.015em] text-[var(--foreground)]">
+                      {t(welcomeGreeting)}
+                    </h1>
+                  </div>
+                </div>
+              )
             ) : (
               <div
                 ref={messagesContainerRef}
@@ -1947,6 +1988,16 @@ export default function ChatPage() {
                   onSubmitUserReply={submitUserReply}
                 />
                 <div ref={messagesEndRef} className="h-px w-full shrink-0" />
+              </div>
+            )}
+
+            {isStudentExperience && hasMessages && (
+              <div className="mx-auto w-full max-w-[900px] pb-1">
+                <StudentCourseStrip
+                  materials={kbOptions}
+                  selectedMaterials={selectedKbOnly}
+                  onToggleMaterial={handleToggleKB}
+                />
               </div>
             )}
 
@@ -2024,6 +2075,11 @@ export default function ChatPage() {
               onSelectCapability={handleSelectCapability}
               onCancelStreaming={cancelStreamingTurn}
               prefillInputRef={prefillInputRef}
+              inputPlaceholder={
+                isStudentExperience
+                  ? t("Ask a question in Hindi, English or your regional language...")
+                  : undefined
+              }
             />
             <div
               aria-hidden="true"

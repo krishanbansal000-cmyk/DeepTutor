@@ -9,6 +9,7 @@ import {
   primaryNavVisible,
   secondaryNavVisible,
   settingsCategoryVisible,
+  workspaceLabel,
 } from "../lib/experience-mode";
 
 test("student is the safe default experience", () => {
@@ -25,6 +26,12 @@ test("student mode keeps learning and personal-material surfaces", () => {
   assert.equal(secondaryNavVisible("student", "/knowledge"), true);
   assert.equal(secondaryNavVisible("student", "/memory"), false);
   assert.equal(knowledgeLabel("student"), "My Materials");
+  assert.equal(workspaceLabel("student", "/home", "Home"), "Ask Drona");
+  assert.equal(workspaceLabel("student", "/book", "Book"), "My Courses");
+  assert.equal(
+    workspaceLabel("student", "/space", "Learning Spaces"),
+    "Practice & Progress",
+  );
 });
 
 test("student mode offers normal chat and quizzes only", () => {
@@ -39,6 +46,7 @@ test("teacher mode adds course authoring and research", () => {
   assert.equal(primaryNavVisible("teacher", "/my-agents"), false);
   assert.equal(capabilityVisible("teacher", "deep_research"), true);
   assert.equal(knowledgeLabel("teacher"), "Course Library");
+  assert.equal(workspaceLabel("teacher", "/home", "Home"), "Home");
 });
 
 test("simple modes keep files and study references but hide technical context", () => {

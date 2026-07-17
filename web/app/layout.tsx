@@ -1,21 +1,25 @@
 import type { Metadata } from "next";
-import { Geist, Lora } from "next/font/google";
+import { Noto_Sans, Noto_Serif_Devanagari } from "next/font/google";
 import "./globals.css";
 import ThemeScript from "@/components/ThemeScript";
 import ToastViewport from "@/components/common/ToastViewport";
 import { AppShellProvider } from "@/context/AppShellContext";
 import { I18nClientBridge } from "@/i18n/I18nClientBridge";
 
-// Geist matches the public site (deeptutor.info) and stays crisp at the
-// small UI sizes the composer/toolbars use, unlike the rounder Jakarta.
-const fontSans = Geist({
-  subsets: ["latin"],
+// Noto keeps English and Devanagari visually consistent across Hindi,
+// Bundeli and the English technical terms used throughout a university course.
+const fontSans = Noto_Sans({
+  subsets: ["latin", "devanagari"],
+  weight: "variable",
   display: "swap",
   variable: "--font-sans",
 });
 
-const fontSerif = Lora({
-  subsets: ["latin"],
+// A restrained serif is reserved for institutional headings and lesson titles;
+// body copy stays in the more legible Noto Sans family.
+const fontSerif = Noto_Serif_Devanagari({
+  subsets: ["latin", "devanagari"],
+  weight: "variable",
   display: "swap",
   variable: "--font-serif",
 });

@@ -88,3 +88,26 @@ export function knowledgeLabel(mode: ExperienceMode): string {
   if (mode === "teacher") return "Course Library";
   return "Knowledge Center";
 }
+
+/**
+ * Student-facing navigation uses familiar study language instead of exposing
+ * DeepTutor's underlying workspace concepts. Routes stay unchanged so saved
+ * links and the advanced experience continue to work.
+ */
+export function workspaceLabel(
+  mode: ExperienceMode,
+  href: string,
+  fallback: string,
+): string {
+  if (mode !== "student") {
+    return href === "/knowledge" ? knowledgeLabel(mode) : fallback;
+  }
+
+  const studentLabels: Record<string, string> = {
+    "/home": "Ask Drona",
+    "/book": "My Courses",
+    "/space": "Practice & Progress",
+    "/knowledge": "My Materials",
+  };
+  return studentLabels[href] ?? fallback;
+}
