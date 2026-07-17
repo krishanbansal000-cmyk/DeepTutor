@@ -52,6 +52,7 @@ import AgentSelector from "./AgentSelector";
 import KnowledgeSelector from "./KnowledgeSelector";
 import ModelSelector from "./ModelSelector";
 import PersonaSelector from "./PersonaSelector";
+import TeachingBoardButton from "@/components/student/TeachingBoard";
 
 type SpaceSelectionCounts = {
   attachments: number;
@@ -215,6 +216,7 @@ export default memo(function ChatComposer({
   onCancelStreaming,
   prefillInputRef,
   inputPlaceholder,
+  latestAssistantContent,
 }: {
   composerRef: RefObject<HTMLDivElement | null>;
   capMenuRef: RefObject<HTMLDivElement | null>;
@@ -322,6 +324,8 @@ export default memo(function ChatComposer({
   prefillInputRef?: React.MutableRefObject<((text: string) => void) | null>;
   /** Override the composer placeholder (e.g. quiz follow-up). */
   inputPlaceholder?: string;
+  /** Latest completed answer, exposed as a classroom-board action in chat. */
+  latestAssistantContent?: string;
 }) {
   const { t } = useTranslation();
   const { experienceMode } = useAppShell();
@@ -953,6 +957,12 @@ export default memo(function ChatComposer({
               </div>
 
               <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                {latestAssistantContent ? (
+                  <TeachingBoardButton
+                    content={latestAssistantContent}
+                    variant="composer"
+                  />
+                ) : null}
                 {advancedExperience &&
                 connectedAgents.length > 0 &&
                 onSelectAgent ? (

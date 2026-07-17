@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Loader2,
   Pause,
+  Palette,
   Play,
   Presentation,
   RotateCcw,
@@ -24,7 +25,13 @@ import {
   lessonStepsFromMarkdown,
 } from "@/lib/teaching-board";
 
-export default function TeachingBoardButton({ content }: { content: string }) {
+export default function TeachingBoardButton({
+  content,
+  variant = "message",
+}: {
+  content: string;
+  variant?: "message" | "composer";
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const steps = useMemo(() => lessonStepsFromMarkdown(content), [content]);
@@ -32,14 +39,19 @@ export default function TeachingBoardButton({ content }: { content: string }) {
   if (!steps.length) return null;
   return (
     <>
-      <Tooltip label={t("Teach on board")} side="top">
+      <Tooltip label={t("Open on teaching board")} side="top">
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label={t("Teach on board")}
-          className="inline-flex items-center justify-center rounded-md p-1 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)]/50 hover:text-[var(--foreground)]"
+          aria-label={t("Open on teaching board")}
+          className={
+            variant === "composer"
+              ? "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)]/55 hover:text-[var(--foreground)]"
+              : "inline-flex items-center justify-center rounded-md p-1 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)]/50 hover:text-[var(--foreground)]"
+          }
         >
           <Presentation size={16} strokeWidth={1.6} />
+          {variant === "composer" && <span>{t("Board")}</span>}
         </button>
       </Tooltip>
       {open && (
@@ -65,11 +77,13 @@ function TeachingBoard({
   const { t } = useTranslation();
   const [current, setCurrent] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [greenBoard, setGreenBoard] = useState(true);
   const [audioState, setAudioState] = useState<"idle" | "loading" | "playing">(
     "idle",
   );
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const boardEndRef = useRef<HTMLDivElement | null>(null);
   const atEnd = current === steps.length - 1;
 
   const stopAudio = useCallback(() => {
@@ -118,6 +132,10 @@ function TeachingBoard({
   useEffect(() => {
     stopAudio();
   }, [current, stopAudio]);
+
+  useEffect(() => {
+    boardEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [current]);
 
   useEffect(() => stopAudio, [stopAudio]);
 
@@ -171,6 +189,18 @@ function TeachingBoard({
         </div>
         <button
           type="button"
+          onClick={() => setGreenBoard((value) => !value)}
+          className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 text-[13px] font-semibold text-[var(--foreground)]"
+          aria-label={t("Change board colour")}
+          title={t("Change board colour")}
+        >
+          <Palette size={17} />
+          <span className="hidden sm:inline">
+            {greenBoard ? t("White board") : t("Green board")}
+          </span>
+        </button>
+        <button
+          type="button"
           onClick={close}
           className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)]"
           aria-label={t("Close board")}
@@ -193,13 +223,30 @@ function TeachingBoard({
         </span>
       </div>
 
-      <main className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-4 sm:p-8">
-        <article className="relative w-full max-w-4xl rounded-xl border-2 border-[#183b5b]/30 bg-[#fffdf7] px-5 py-7 shadow-[0_16px_48px_rgba(46,38,30,0.12)] sm:min-h-[420px] sm:px-10 sm:py-10">
-          <div className="absolute inset-x-5 top-0 h-1 rounded-b-full bg-[#183b5b] sm:inset-x-10" />
-          <AssistantResponse
-            content={steps[current]}
-            className="text-[17px] leading-[1.8] text-[#25231f] sm:text-[19px]"
-          />
+      <main className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-4 sm:p-8">
+        <article
+          className={`teaching-board-surface relative w-full max-w-4xl rounded-xl px-5 py-7 shadow-[0_16px_48px_rgba(46,38,30,0.18)] sm:min-h-[420px] sm:px-10 sm:py-10 ${
+            greenBoard ? "teaching-board-green" : "teaching-board-white"
+          }`}
+        >
+          {steps.slice(0, current + 1).map((step, index) => (
+            <section
+              key={`${index}-${step.slice(0, 32)}`}
+              className={`teaching-board-step ${
+                index === current ? "teaching-board-step-active" : ""
+              }`}
+            >
+              <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.09em] opacity-65">
+                <span>{t("Step")}</span>
+                <span>{index + 1}</span>
+              </div>
+              <AssistantResponse
+                content={step}
+                className="text-[17px] leading-[1.8] sm:text-[19px]"
+              />
+            </section>
+          ))}
+          <div ref={boardEndRef} aria-hidden="true" />
         </article>
       </main>
 

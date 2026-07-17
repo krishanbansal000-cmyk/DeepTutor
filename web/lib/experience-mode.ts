@@ -16,6 +16,7 @@ export type ChatSpaceItemKey =
 const STUDENT_PRIMARY_NAV = new Set(["/home", "/book", "/space"]);
 const TEACHER_PRIMARY_NAV = new Set([
   "/home",
+  "/space/questions",
   "/co-writer",
   "/book",
   "/space",

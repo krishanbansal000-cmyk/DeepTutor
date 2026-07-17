@@ -155,7 +155,7 @@
   }
 
   html,
-  body {
+body {
     height: 100%;
     overflow: hidden;
   }
@@ -186,6 +186,187 @@
   summary::-webkit-details-marker {
     display: none;
   }
+}
+
+@keyframes drona-diagram-reveal {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.drona-diagram-canvas {
+  min-width: 420px;
+}
+
+.drona-diagram-canvas > svg {
+  display: block;
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 220px;
+  margin-inline: auto;
+  animation: drona-diagram-reveal 340ms ease-out both;
+}
+
+.drona-diagram-canvas svg .nodeLabel,
+.drona-diagram-canvas svg .edgeLabel,
+.drona-diagram-canvas svg .label,
+.drona-diagram-canvas svg text,
+.drona-diagram-canvas svg tspan {
+  font-family: var(--font-sans), "Noto Sans Devanagari", system-ui, sans-serif !important;
+  font-size: 17px !important;
+  line-height: 1.35;
+}
+
+.drona-diagram-canvas svg .edgeLabel {
+  font-size: 15px !important;
+}
+
+@media (max-width: 640px) {
+  .drona-diagram-canvas {
+    min-width: 360px;
+  }
+
+  .drona-diagram-canvas svg .nodeLabel,
+  .drona-diagram-canvas svg .label,
+  .drona-diagram-canvas svg text,
+  .drona-diagram-canvas svg tspan {
+    font-size: 15px !important;
+  }
+}
+
+@keyframes drona-board-write {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes drona-board-draw {
+  from { stroke-dashoffset: 1800; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes drona-board-pop {
+  from { opacity: 0; transform: scaleY(0.08); transform-origin: bottom; }
+  to { opacity: 1; transform: scaleY(1); transform-origin: bottom; }
+}
+
+.teaching-board-surface {
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.teaching-board-white {
+  --foreground: #25231f;
+  --muted-foreground: #655f56;
+  --card: #fffdf7;
+  --muted: #eee7d8;
+  --border: #d6c7ad;
+  border: 2px solid rgb(24 59 91 / 0.3);
+  background: #fffdf7;
+  color: #25231f;
+}
+
+.teaching-board-green {
+  --foreground: #eef6f1;
+  --muted-foreground: #c9ddd3;
+  --card: #294f43;
+  --muted: #315d4f;
+  --border: #6f8f83;
+  --primary: #ffe49c;
+  border: 9px solid #6e4a26;
+  background-color: #20463a;
+  background-image: radial-gradient(rgb(255 255 255 / 0.055) 1px, transparent 1px);
+  background-size: 22px 22px;
+  color: #eef6f1;
+  box-shadow: 0 16px 44px rgb(24 20 14 / 0.28), inset 0 0 0 2px #4d3318;
+}
+
+.teaching-board-step {
+  position: relative;
+  padding-bottom: 1.4rem;
+}
+
+.teaching-board-step + .teaching-board-step {
+  border-top: 1px dashed color-mix(in srgb, currentColor 22%, transparent);
+  padding-top: 1.4rem;
+}
+
+.teaching-board-step-active {
+  animation: drona-board-write 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.teaching-board-step-active::after {
+  content: "";
+  display: block;
+  width: min(300px, 55%);
+  height: 3px;
+  margin-top: 0.8rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.35;
+  transform: rotate(-0.4deg);
+}
+
+.board-plot-grid {
+  stroke: rgb(36 64 56 / 0.14);
+  stroke-width: 1;
+}
+
+.board-plot-axis {
+  stroke: #315d50;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.board-plot-label {
+  fill: #46675e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.board-plot-title {
+  fill: #244038;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.board-plot-line {
+  fill: none;
+  stroke: #d17c2f;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1800;
+  animation: drona-board-draw 1.3s ease-out forwards;
+}
+
+.board-plot-line-shadow {
+  stroke: #633d20;
+  stroke-width: 6;
+  opacity: 0.15;
+  transform: translate(1px, 1px);
+}
+
+.board-plot-point {
+  fill: #fffaf0;
+  stroke: #d17c2f;
+  stroke-width: 3;
+  opacity: 0;
+  animation: drona-board-pop 260ms ease-out forwards;
+}
+
+.board-plot-bar {
+  fill: #d17c2f;
+  stroke: #845025;
+  stroke-width: 1.5;
+  opacity: 0;
+  animation: drona-board-pop 420ms ease-out forwards;
 }
 
 @media (max-width: 767px) {

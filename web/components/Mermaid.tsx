@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import { subscribeToThemeChanges } from "@/lib/theme";
 
 interface MermaidProps {
@@ -74,7 +75,11 @@ function applyMermaidTheme(mermaid: (typeof import("mermaid"))["default"]) {
       useMaxWidth: true,
       htmlLabels: false,
       curve: "basis",
+      nodeSpacing: 48,
+      rankSpacing: 58,
+      padding: 16,
     },
+    fontSize: 17,
     themeVariables: themeVariablesFromCss(),
   });
 }
@@ -100,6 +105,7 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className = "" }) => {
   const [stable, setStable] = useState(false);
   const [id] = useState(() => `mermaid-${++mermaidIdCounter}`);
   const [themeToken, setThemeToken] = useState(0);
+  const [zoom, setZoom] = useState(1);
   const lastChartRef = useRef(chart);
 
   useEffect(() => {
@@ -187,11 +193,59 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className = "" }) => {
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={`my-6 flex justify-center overflow-x-auto ${className}`}
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <section
+      className={`my-6 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-sm ${className}`}
+      aria-label={t("Visual explanation")}
+    >
+      <header className="flex min-h-11 items-center gap-2 border-b border-[var(--border)] bg-[var(--muted)]/35 px-3 sm:px-4">
+        <span className="text-[12px] font-semibold uppercase tracking-[0.07em] text-[var(--muted-foreground)]">
+          {t("Visual explanation")}
+        </span>
+        <span className="ml-auto text-[11px] font-medium tabular-nums text-[var(--muted-foreground)]">
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          type="button"
+          onClick={() => setZoom((value) => Math.max(0.7, value - 0.2))}
+          disabled={zoom <= 0.7}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] disabled:opacity-35"
+          aria-label={t("Zoom out")}
+          title={t("Zoom out")}
+        >
+          <ZoomOut size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setZoom(1)}
+          disabled={zoom === 1}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] disabled:opacity-35"
+          aria-label={t("Fit")}
+          title={t("Fit")}
+        >
+          <RotateCcw size={15} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setZoom((value) => Math.min(2.6, value + 0.2))}
+          disabled={zoom >= 2.6}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] disabled:opacity-35"
+          aria-label={t("Zoom in")}
+          title={t("Zoom in")}
+        >
+          <ZoomIn size={16} />
+        </button>
+      </header>
+      <div
+        ref={containerRef}
+        className="drona-diagram-viewport max-h-[68vh] overflow-auto bg-[var(--background)]/55 p-3 sm:p-5"
+      >
+        <div
+          className="drona-diagram-canvas mx-auto min-w-0 transition-[width] duration-150 ease-out"
+          style={{ width: `${zoom * 100}%` }}
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </div>
+    </section>
   );
 };
 

@@ -43,7 +43,9 @@ test("student mode offers normal chat and quizzes only", () => {
 
 test("teacher mode adds course authoring and research", () => {
   assert.equal(primaryNavVisible("teacher", "/co-writer"), true);
-  assert.equal(primaryNavVisible("teacher", "/my-agents"), false);
+  assert.equal(primaryNavVisible("teacher", "/space/questions"), true);
+  assert.equal(primaryNavVisible("teacher", "/agents"), false);
+  assert.equal(primaryNavVisible("teacher", "/partners"), false);
   assert.equal(capabilityVisible("teacher", "deep_research"), true);
   assert.equal(knowledgeLabel("teacher"), "Course Library");
   assert.equal(workspaceLabel("teacher", "/home", "Home"), "Home");
@@ -59,7 +61,8 @@ test("simple modes keep files and study references but hide technical context", 
 });
 
 test("advanced mode preserves every existing surface", () => {
-  assert.equal(primaryNavVisible("advanced", "/my-agents"), true);
+  assert.equal(primaryNavVisible("advanced", "/agents"), true);
+  assert.equal(primaryNavVisible("advanced", "/partners"), true);
   assert.equal(secondaryNavVisible("advanced", "/memory"), true);
   assert.equal(capabilityVisible("advanced", "visualize"), true);
   assert.equal(chatSpaceItemVisible("advanced", "memory"), true);

@@ -1461,7 +1461,7 @@ export const ChatMessageList = memo(function ChatMessageList({
                         }
                       />
                     )}
-                    {showActions && experienceMode === "student" && (
+                    {showActions && (
                       <TeachingBoardButton content={msg.content} />
                     )}
                     {showActions && showRegenerate && (

@@ -647,6 +647,15 @@ export default function ChatPage() {
   }, [capabilityNeedsConfig, ensureActivityPanelOpen]);
   const hasMessages = state.messages.length > 0;
   const isStudentExperience = experienceMode === "student";
+  const latestAssistantContent = useMemo(() => {
+    for (let index = state.messages.length - 1; index >= 0; index -= 1) {
+      const message = state.messages[index];
+      if (message.role === "assistant" && message.content.trim()) {
+        return message.content;
+      }
+    }
+    return "";
+  }, [state.messages]);
   const practiceRequested = searchParams.get("practice") === "1";
 
   // The mobile Practice destination opens the ordinary tutor and prepares a
@@ -2080,6 +2089,7 @@ export default function ChatPage() {
                   ? t("Ask a question in Hindi, English or your regional language...")
                   : undefined
               }
+              latestAssistantContent={latestAssistantContent}
             />
             <div
               aria-hidden="true"

@@ -11,6 +11,7 @@ import {
   Bot,
   Brain,
   ChevronDown,
+  ClipboardCheck,
   Github,
   HeartHandshake,
   House,
@@ -70,6 +71,12 @@ const PRIMARY_NAV: NavEntry[] = [
     label: "My Agents",
     icon: Bot,
     tooltipKey: "Agents tooltip",
+  },
+  {
+    href: "/space/questions",
+    label: "Assessments",
+    icon: ClipboardCheck,
+    requires: "llm",
   },
   {
     href: "/co-writer",
