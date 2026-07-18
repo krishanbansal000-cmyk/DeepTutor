@@ -3,6 +3,10 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import {
+  AskUserOptions,
+  extractAskUserPayload,
+} from "@/components/chat/home/AskUserOptions";
 import ChatSourceCitations from "@/components/chat/home/ChatSourceCitations";
 import { AssistantActivity } from "@/components/chat/home/TracePanels";
 import type { MessageAttachment } from "@/context/UnifiedChatContext";
@@ -20,14 +24,20 @@ export default function ClassroomWorkspace({
   events,
   isStreaming,
   onOpenSource,
+  onSubmitUserReply,
 }: {
   question: string;
   content: string;
   events: StreamEvent[];
   isStreaming: boolean;
   onOpenSource?: (attachment: MessageAttachment) => void;
+  onSubmitUserReply: (reply: {
+    text?: string;
+    answers?: Array<{ questionId: string; text: string }>;
+  }) => void;
 }) {
   const { t } = useTranslation();
+  const checkpoint = useMemo(() => extractAskUserPayload(events), [events]);
   const generatedSteps = useMemo(
     () => lessonStepsFromMarkdown(content),
     [content],
@@ -44,15 +54,28 @@ export default function ClassroomWorkspace({
   return (
     <section
       aria-label={t("Classroom")}
-      className="flex min-h-0 min-w-0 flex-1 py-3"
+      className="flex min-h-0 min-w-0 flex-1 py-1.5 sm:py-2"
     >
       <TeachingBoard
         embedded
         title={title}
         steps={steps}
         streaming={isStreaming && generatedSteps.length > 0}
+        checkpointPending={Boolean(checkpoint && !checkpoint.resolved)}
+        checkpoint={
+          checkpoint ? (
+            <div aria-label={t("Classroom checkpoint")}>
+              <AskUserOptions
+                data={checkpoint}
+                onSubmit={onSubmitUserReply}
+                collapsible={checkpoint.resolved}
+                defaultCollapsed={checkpoint.resolved}
+              />
+            </div>
+          ) : undefined
+        }
         activity={
-          isStreaming || events.length > 0 ? (
+          isStreaming ? (
             <AssistantActivity
               events={events}
               isStreaming={isStreaming}

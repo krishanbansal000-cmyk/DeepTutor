@@ -22,6 +22,9 @@ _RUNTIME_ONLY_KEYS = {
     # capability's public config schema; stripped here so it never trips
     # ``extra="forbid"`` (turn_runtime carries it through to the turn config).
     "subagent_consult_budget",
+    # Presentation-only chat hint, carried through by turn_runtime after the
+    # public capability config has been validated.
+    "classroom_mode",
 }
 
 

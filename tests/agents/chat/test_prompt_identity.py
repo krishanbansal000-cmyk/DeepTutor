@@ -113,3 +113,28 @@ def test_normal_chat_prompt_enables_selective_math_and_diagrams():
     assert "portable Mermaid 11 syntax" in policy
     assert "absolutely no HTML" in policy
     assert "Prefer prose" in policy
+
+
+def test_classroom_turn_adds_checkpoint_policy_only_when_requested():
+    root = Path(__file__).resolve().parents[3] / "deeptutor/agents/chat/prompts"
+    prompts = yaml.safe_load(
+        (root / "en" / "agentic_chat.yaml").read_text(encoding="utf-8")
+    )
+    assembler = ChatPromptAssembler(prompts=prompts, language="en")
+
+    ordinary = assembler.blocks(
+        context=UnifiedContext(user_message="Explain loops"),
+        tool_manifest="- ask_user",
+    )
+    classroom = assembler.blocks(
+        context=UnifiedContext(
+            user_message="Explain loops",
+            config_overrides={"classroom_mode": True},
+        ),
+        tool_manifest="- ask_user",
+    )
+
+    assert all(block.name != "classroom" for block in ordinary)
+    policy = next(block.content for block in classroom if block.name == "classroom")
+    assert "call ask_user exactly once" in policy
+    assert "finish the remaining lesson" in policy

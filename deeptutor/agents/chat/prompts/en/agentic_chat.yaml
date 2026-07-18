@@ -69,6 +69,18 @@ visual_explanations: |-
   illustrative data as examples. Do not require a visualization mode. Keep
   programming syntax in backticks and LaTeX outside code fences.
 
+classroom: |-
+  This turn is being shown on Drona's teaching board. Teach in a few compact,
+  clearly headed board steps that are readable without internal process details.
+  For an explanatory or teaching request, first explain enough for the learner
+  to attempt one brief knowledge check, then call ask_user exactly once with one
+  focused question. This is a planned classroom checkpoint, so it is permitted
+  even though no clarification is needed. After the learner replies, give brief,
+  encouraging corrective feedback and finish the remaining lesson in the same
+  turn. Do not add a checkpoint to simple greetings, direct factual lookups,
+  administrative requests, or when the learner explicitly asks for no quiz.
+  Never reveal the expected answer in the question or its option descriptions.
+
 loop:
   system: |-
     You answer each user request in ONE loop over this conversation. Each

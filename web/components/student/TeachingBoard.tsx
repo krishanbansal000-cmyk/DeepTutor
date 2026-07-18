@@ -27,6 +27,10 @@ import AssistantResponse from "@/components/common/AssistantResponse";
 import Tooltip from "@/components/common/Tooltip";
 import { apiFetch, apiUrl } from "@/lib/api";
 import {
+  playPcm16Stream,
+  type PcmStreamPlayback,
+} from "@/lib/pcm-stream-player";
+import {
   boardSpeechText,
   boardTitleFromMarkdown,
   lessonStepsFromMarkdown,
@@ -78,6 +82,8 @@ export function TeachingBoard({
   onClose,
   embedded = false,
   streaming = false,
+  checkpoint,
+  checkpointPending = false,
   activity,
   supplementary,
 }: {
@@ -86,10 +92,12 @@ export function TeachingBoard({
   onClose?: () => void;
   embedded?: boolean;
   streaming?: boolean;
+  checkpoint?: ReactNode;
+  checkpointPending?: boolean;
   activity?: ReactNode;
   supplementary?: ReactNode;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [current, setCurrent] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [greenBoard, setGreenBoard] = useState(true);
@@ -98,10 +106,17 @@ export function TeachingBoard({
   );
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
-  const boardEndRef = useRef<HTMLDivElement | null>(null);
+  const streamPlaybackRef = useRef<PcmStreamPlayback | null>(null);
+  const audioAbortRef = useRef<AbortController | null>(null);
+  const boardScrollRef = useRef<HTMLElement | null>(null);
   const atEnd = current === steps.length - 1;
+  const currentStep = steps[current] ?? "";
 
   const stopAudio = useCallback(() => {
+    audioAbortRef.current?.abort();
+    audioAbortRef.current = null;
+    streamPlaybackRef.current?.stop();
+    streamPlaybackRef.current = null;
     audioRef.current?.pause();
     audioRef.current = null;
     if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
@@ -154,12 +169,28 @@ export function TeachingBoard({
   }, [atEnd, current, playing, steps.length]);
 
   useEffect(() => {
+    if (checkpointPending) setPlaying(false);
+  }, [checkpointPending]);
+
+  useEffect(() => {
     stopAudio();
   }, [current, stopAudio]);
 
   useEffect(() => {
-    boardEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [current]);
+    const scrollRoot = boardScrollRef.current;
+    if (!scrollRoot) return;
+
+    // Keep live tokens visible without moving the surrounding chat page. Once
+    // generation finishes (or the student changes slides), return to the top
+    // of that board step so every lesson remains easy to navigate.
+    const frame = window.requestAnimationFrame(() => {
+      scrollRoot.scrollTo({
+        top: streaming || checkpointPending ? scrollRoot.scrollHeight : 0,
+        behavior: streaming || checkpointPending ? "auto" : "smooth",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [checkpointPending, current, currentStep, streaming]);
 
   useEffect(() => stopAudio, [stopAudio]);
 
@@ -171,14 +202,43 @@ export function TeachingBoard({
     const text = boardSpeechText(steps[current]);
     if (!text) return;
     setAudioState("loading");
+    const controller = new AbortController();
+    audioAbortRef.current = controller;
+    const language = i18n.resolvedLanguage || i18n.language || "en";
     try {
-      const response = await apiFetch(apiUrl("/api/v1/voice/tts"), {
+      const response = await apiFetch(apiUrl("/api/v1/voice/tts/stream"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, language }),
+        signal: controller.signal,
       });
-      if (!response.ok) throw new Error("tts unavailable");
-      const blob = await response.blob();
+      if (response.ok && response.body) {
+        const playback = playPcm16Stream(response, {
+          onStart: () => setAudioState("playing"),
+        });
+        streamPlaybackRef.current = playback;
+        void playback.done
+          .catch(() => undefined)
+          .finally(() => {
+            if (streamPlaybackRef.current === playback) {
+              streamPlaybackRef.current = null;
+              audioAbortRef.current = null;
+              setAudioState("idle");
+            }
+          });
+        return;
+      }
+
+      // Preserve compatibility when an administrator switches to a cloud TTS
+      // provider that only supports completed audio responses.
+      const fallback = await apiFetch(apiUrl("/api/v1/voice/tts"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, language }),
+        signal: controller.signal,
+      });
+      if (!fallback.ok) throw new Error("tts unavailable");
+      const blob = await fallback.blob();
       const url = URL.createObjectURL(blob);
       audioUrlRef.current = url;
       const audio = new Audio(url);
@@ -190,7 +250,7 @@ export function TeachingBoard({
     } catch {
       stopAudio();
     }
-  }, [audioState, current, steps, stopAudio]);
+  }, [audioState, current, i18n.language, i18n.resolvedLanguage, steps, stopAudio]);
 
   return (
     <div
@@ -240,12 +300,16 @@ export function TeachingBoard({
       </header>
 
       {activity ? (
-        <div className="max-h-[34%] shrink-0 overflow-y-auto border-b border-[var(--border)] bg-[var(--card)] px-3 pt-2 sm:px-6">
+        <div
+          className={`shrink-0 overflow-y-auto border-b border-[var(--border)] bg-[var(--card)] px-3 pt-1 sm:px-6 ${
+            embedded ? "max-h-[112px]" : "max-h-[34%]"
+          }`}
+        >
           {activity}
         </div>
       ) : null}
 
-      <div className="flex shrink-0 items-center gap-1.5 border-b border-[var(--border)] bg-[var(--card)] px-3 py-2 sm:px-6">
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-[var(--border)] bg-[var(--card)] px-3 py-1.5 sm:px-6">
         {steps.map((_, index) => (
           <span
             key={index}
@@ -259,38 +323,43 @@ export function TeachingBoard({
         </span>
       </div>
 
-      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6">
-        <div className="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-4">
+      <main
+        ref={boardScrollRef}
+        className={`min-h-0 min-w-0 flex-1 overscroll-contain overflow-y-auto overflow-x-hidden ${
+          embedded ? "p-2 sm:p-3" : "p-3 sm:p-6"
+        }`}
+      >
+        <div className="mx-auto flex min-h-full w-full min-w-0 max-w-4xl flex-col gap-4">
           <article
-            className={`teaching-board-surface relative min-w-0 w-full overflow-x-hidden rounded-xl px-4 py-6 shadow-[0_16px_48px_rgba(46,38,30,0.18)] sm:min-h-[360px] sm:px-10 sm:py-10 ${
+            className={`teaching-board-surface relative min-h-full min-w-0 w-full shrink-0 overflow-x-hidden rounded-xl px-4 py-6 shadow-[0_16px_48px_rgba(46,38,30,0.18)] sm:px-10 sm:py-8 ${
               greenBoard ? "teaching-board-green" : "teaching-board-white"
             }`}
           >
-            {steps.slice(0, current + 1).map((step, index) => (
-              <section
-                key={`${index}-${step.slice(0, 32)}`}
-                className={`teaching-board-step min-w-0 ${
-                  index === current ? "teaching-board-step-active" : ""
-                }`}
-              >
-                <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.09em] opacity-65">
-                  <span>{t("Step")}</span>
-                  <span>{index + 1}</span>
+            <section
+              key={current}
+              className="teaching-board-step teaching-board-step-active min-w-0"
+            >
+              <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.09em] opacity-65">
+                <span>{t("Step")}</span>
+                <span>{current + 1}</span>
+              </div>
+              <AssistantResponse
+                content={currentStep}
+                isStreaming={streaming}
+                className="min-w-0 text-[17px] leading-[1.8] sm:text-[19px]"
+              />
+              {checkpoint ? (
+                <div className="mt-5 min-w-0 border-t border-current/20 pt-2">
+                  {checkpoint}
                 </div>
-                <AssistantResponse
-                  content={step}
-                  isStreaming={streaming && index === current}
-                  className="min-w-0 text-[17px] leading-[1.8] sm:text-[19px]"
-                />
-              </section>
-            ))}
-            <div ref={boardEndRef} aria-hidden="true" />
+              ) : null}
+            </section>
           </article>
           {supplementary}
         </div>
       </main>
 
-      <footer className="flex min-h-[68px] shrink-0 items-center justify-between gap-2 border-t border-[var(--border)] bg-[var(--card)] px-3 py-2 sm:min-h-[76px] sm:px-6 sm:py-3">
+      <footer className="flex min-h-[60px] shrink-0 items-center justify-between gap-2 border-t border-[var(--border)] bg-[var(--card)] px-3 py-2 sm:px-6">
         <button
           type="button"
           onClick={() => setCurrent((value) => Math.max(0, value - 1))}
@@ -321,7 +390,8 @@ export function TeachingBoard({
           <button
             type="button"
             onClick={() => setPlaying((value) => !value)}
-            className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)]"
+            disabled={checkpointPending}
+            className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-40"
             aria-label={playing ? t("Pause") : t("Play")}
           >
             {playing ? <Pause size={18} /> : <Play size={18} />}

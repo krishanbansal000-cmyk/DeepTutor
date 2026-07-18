@@ -70,16 +70,18 @@ function applyMermaidTheme(mermaid: (typeof import("mermaid"))["default"]) {
     startOnLoad: false,
     theme: "base",
     securityLevel: "strict",
+    htmlLabels: true,
     fontFamily: "ui-sans-serif, system-ui, sans-serif",
     flowchart: {
       useMaxWidth: true,
-      htmlLabels: false,
+      htmlLabels: true,
       curve: "basis",
       nodeSpacing: 48,
       rankSpacing: 58,
-      padding: 16,
+      padding: 18,
+      wrappingWidth: 220,
     },
-    fontSize: 17,
+    fontSize: 15,
     themeVariables: themeVariablesFromCss(),
   });
 }
@@ -105,7 +107,7 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className = "" }) => {
   const [stable, setStable] = useState(false);
   const [id] = useState(() => `mermaid-${++mermaidIdCounter}`);
   const [themeToken, setThemeToken] = useState(0);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.85);
   const lastChartRef = useRef(chart);
 
   useEffect(() => {
@@ -206,8 +208,8 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className = "" }) => {
         </span>
         <button
           type="button"
-          onClick={() => setZoom((value) => Math.max(0.7, value - 0.2))}
-          disabled={zoom <= 0.7}
+          onClick={() => setZoom((value) => Math.max(0.4, value - 0.2))}
+          disabled={zoom <= 0.4}
           className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] disabled:opacity-35"
           aria-label={t("Zoom out")}
           title={t("Zoom out")}
@@ -216,8 +218,8 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className = "" }) => {
         </button>
         <button
           type="button"
-          onClick={() => setZoom(1)}
-          disabled={zoom === 1}
+          onClick={() => setZoom(0.85)}
+          disabled={zoom === 0.85}
           className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] disabled:opacity-35"
           aria-label={t("Fit")}
           title={t("Fit")}
@@ -226,8 +228,8 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className = "" }) => {
         </button>
         <button
           type="button"
-          onClick={() => setZoom((value) => Math.min(2.6, value + 0.2))}
-          disabled={zoom >= 2.6}
+          onClick={() => setZoom((value) => Math.min(3.0, value + 0.2))}
+          disabled={zoom >= 3.0}
           className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] disabled:opacity-35"
           aria-label={t("Zoom in")}
           title={t("Zoom in")}

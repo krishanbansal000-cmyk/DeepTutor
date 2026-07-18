@@ -679,6 +679,10 @@ class TurnRuntimeManager:
             # key — stripped before validation, merged back into the turn config
             # and read by the subagent capability from context.config_overrides.
             "subagent_consult_budget",
+            # Frontend presentation hint for the normal chat loop. Classroom
+            # stays on the chat capability but adds a board-friendly teaching
+            # policy and one in-turn knowledge checkpoint.
+            "classroom_mode",
         )
         runtime_only_config = {
             key: raw_config.pop(key) for key in runtime_only_keys if key in raw_config

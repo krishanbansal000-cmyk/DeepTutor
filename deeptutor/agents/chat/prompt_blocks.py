@@ -71,6 +71,10 @@ class ChatPromptAssembler:
         visual_explanations = self._t("visual_explanations")
         if visual_explanations:
             blocks.append(PromptBlock("visual_explanations", visual_explanations))
+        if context.config_overrides.get("classroom_mode") is True:
+            classroom = self._t("classroom")
+            if classroom:
+                blocks.append(PromptBlock("classroom", classroom))
         blocks.append(PromptBlock("loop", self._t("loop.system")))
         # Capability playbooks sit high so they frame the whole turn when active;
         # empty blocks are omitted by ``system_prompt``'s join.

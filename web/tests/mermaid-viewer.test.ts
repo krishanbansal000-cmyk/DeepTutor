@@ -13,9 +13,9 @@ const globalStyles = readFileSync(
 );
 
 test("diagram viewer provides bounded zoom controls", () => {
-  assert.match(mermaidViewer, /Math\.max\(0\.7, value - 0\.2\)/);
-  assert.match(mermaidViewer, /Math\.min\(2\.6, value \+ 0\.2\)/);
-  assert.match(mermaidViewer, /setZoom\(1\)/);
+  assert.match(mermaidViewer, /Math\.max\(0\.4, value - 0\.2\)/);
+  assert.match(mermaidViewer, /Math\.min\(3\.0, value \+ 0\.2\)/);
+  assert.match(mermaidViewer, /setZoom\(0\.85\)/);
   assert.match(mermaidViewer, /aria-label=\{t\("Zoom in"\)\}/);
   assert.match(mermaidViewer, /aria-label=\{t\("Zoom out"\)\}/);
 });
@@ -23,7 +23,8 @@ test("diagram viewer provides bounded zoom controls", () => {
 test("flow diagrams use classroom-readable spacing and typography", () => {
   assert.match(mermaidViewer, /nodeSpacing: 48/);
   assert.match(mermaidViewer, /rankSpacing: 58/);
-  assert.match(mermaidViewer, /fontSize: 17/);
+  assert.match(mermaidViewer, /fontSize: 15/);
+  assert.match(mermaidViewer, /htmlLabels: true/);
   assert.match(globalStyles, /\.drona-diagram-canvas svg \.nodeLabel/);
-  assert.match(globalStyles, /font-size: 17px !important/);
+  assert.match(globalStyles, /font-size: 15px !important/);
 });

@@ -1574,6 +1574,9 @@ export default function ChatPage() {
         if (!researchValidation.valid) return;
         config = buildResearchWSConfig(researchConfig);
       }
+      if (classroomMode) {
+        config = { ...(config ?? {}), classroom_mode: true };
+      }
       // When a connected agent is selected, carry the per-turn consult budget
       // (how many times DeepTutor may ask it) so the subagent capability uses it.
       if (selectedAgent && subagentBudget) {
@@ -1620,6 +1623,7 @@ export default function ChatPage() {
     [
       attachments,
       bookReferencesPayload,
+      classroomMode,
       historyReferencesPayload,
       isQuizMode,
       isResearchMode,
@@ -1631,6 +1635,7 @@ export default function ChatPage() {
       quizPdf,
       researchConfig,
       researchValidation,
+      selectedAgent,
       selectedHistorySessions.length,
       selectedAgentSessions.length,
       selectedMemoryFiles.length,
@@ -1640,6 +1645,7 @@ export default function ChatPage() {
       sendMessage,
       shouldAutoScrollRef,
       state.isStreaming,
+      subagentBudget,
       t,
       visualizeConfig,
     ],
@@ -1909,7 +1915,7 @@ export default function ChatPage() {
           data-viewer-open={viewerPanelOpen ? "true" : "false"}
           className="chat-preview-shell flex h-full flex-col overflow-hidden bg-[var(--background)]"
         >
-          {(hasMessages || !isStudentExperience) && (
+          {((hasMessages && !classroomMode) || !isStudentExperience) && (
           <div className="mx-auto flex w-full max-w-[960px] flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-6 pt-3 pb-0">
             <div className="group/title min-w-0 flex flex-1 items-center gap-2">
               {sessionTitleEditing ? (
@@ -1987,6 +1993,7 @@ export default function ChatPage() {
                 events={classroomAssistant?.events ?? []}
                 isStreaming={state.isStreaming}
                 onOpenSource={handlePreviewMessageAttachment}
+                onSubmitUserReply={submitUserReply}
               />
             ) : !hasMessages ? (
               <div className="flex flex-1 min-h-0 flex-col items-center justify-end pb-14 animate-fade-in">

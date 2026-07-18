@@ -194,7 +194,7 @@ body {
 }
 
 .drona-diagram-canvas {
-  min-width: 420px;
+  min-width: 320px;
 }
 
 .drona-diagram-canvas > svg {
@@ -202,7 +202,7 @@ body {
   width: 100% !important;
   max-width: none !important;
   height: auto !important;
-  min-height: 220px;
+  min-height: 180px;
   margin-inline: auto;
   animation: drona-diagram-reveal 340ms ease-out both;
 }
@@ -213,24 +213,39 @@ body {
 .drona-diagram-canvas svg text,
 .drona-diagram-canvas svg tspan {
   font-family: var(--font-sans), "Noto Sans Devanagari", system-ui, sans-serif !important;
-  font-size: 17px !important;
-  line-height: 1.35;
+  font-size: 15px !important;
+  line-height: 1.4;
 }
 
 .drona-diagram-canvas svg .edgeLabel {
-  font-size: 15px !important;
+  font-size: 13px !important;
+}
+
+/* Ensure node boxes grow to contain wrapped labels (htmlLabels=true). */
+.drona-diagram-canvas svg .node rect,
+.drona-diagram-canvas svg .node polygon,
+.drona-diagram-canvas svg .node circle,
+.drona-diagram-canvas svg .node ellipse {
+  min-height: 36px;
+}
+
+.drona-diagram-canvas svg .node .label foreignObject,
+.drona-diagram-canvas svg .nodeLabel {
+  overflow: visible;
+  white-space: normal;
+  word-break: break-word;
 }
 
 @media (max-width: 640px) {
   .drona-diagram-canvas {
-    min-width: 360px;
+    min-width: 280px;
   }
 
   .drona-diagram-canvas svg .nodeLabel,
   .drona-diagram-canvas svg .label,
   .drona-diagram-canvas svg text,
   .drona-diagram-canvas svg tspan {
-    font-size: 15px !important;
+    font-size: 13px !important;
   }
 }
 

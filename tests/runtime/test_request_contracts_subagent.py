@@ -22,6 +22,11 @@ def test_chat_config_allows_subagent_consult_budget() -> None:
     validate_capability_config("chat", {"subagent_consult_budget": 5})
 
 
+def test_chat_config_allows_classroom_presentation_hint() -> None:
+    validate_chat_request_config({"classroom_mode": True})
+    validate_capability_config("chat", {"classroom_mode": True})
+
+
 def test_chat_config_still_rejects_unknown_keys() -> None:
     with pytest.raises(ValueError, match="Extra inputs are not permitted"):
         validate_chat_request_config({"totally_unknown_key": 1})
