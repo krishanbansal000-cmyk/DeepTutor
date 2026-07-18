@@ -23,8 +23,15 @@ const TEACHER_PRIMARY_NAV = new Set([
 ]);
 const SIMPLE_SECONDARY_NAV = new Set(["/knowledge", "/settings"]);
 
-const STUDENT_CAPABILITIES = new Set(["", "deep_question"]);
-const TEACHER_CAPABILITIES = new Set(["", "deep_question", "deep_research"]);
+const LEARNING_CAPABILITIES = new Set([
+  "",
+  "classroom",
+  "deep_solve",
+  "deep_question",
+  "deep_research",
+  "visualize",
+  "mastery_path",
+]);
 
 const SIMPLE_SPACE_ITEMS = new Set<ChatSpaceItemKey>([
   "attach",
@@ -65,9 +72,12 @@ export function capabilityVisible(
   capability: string,
 ): boolean {
   if (mode === "advanced") return true;
-  return (mode === "teacher" ? TEACHER_CAPABILITIES : STUDENT_CAPABILITIES).has(
-    capability,
-  );
+  return LEARNING_CAPABILITIES.has(capability);
+}
+
+/** Classroom is a presentation of normal chat, not a backend capability. */
+export function runtimeCapabilityValue(capability: string): string {
+  return capability === "classroom" ? "" : capability;
 }
 
 export function capabilityLabel(

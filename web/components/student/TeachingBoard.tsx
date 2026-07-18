@@ -28,13 +28,27 @@ import {
 export default function TeachingBoardButton({
   content,
   variant = "message",
+  autoOpenKey = 0,
 }: {
   content: string;
   variant?: "message" | "composer";
+  autoOpenKey?: number;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const lastAutoOpenKeyRef = useRef(0);
   const steps = useMemo(() => lessonStepsFromMarkdown(content), [content]);
+
+  useEffect(() => {
+    if (
+      autoOpenKey > 0 &&
+      autoOpenKey !== lastAutoOpenKeyRef.current &&
+      steps.length > 0
+    ) {
+      setOpen(true);
+    }
+    lastAutoOpenKeyRef.current = autoOpenKey;
+  }, [autoOpenKey, steps.length]);
 
   if (!steps.length) return null;
   return (

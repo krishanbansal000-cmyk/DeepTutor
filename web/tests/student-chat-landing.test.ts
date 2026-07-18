@@ -33,3 +33,10 @@ test("Drona Tutor remains a selectable student mode", () => {
     /experienceMode === "student" \? \(\s*<div[^>]*>\s*<GraduationCap/,
   );
 });
+
+test("Classroom reuses chat and opens completed answers on the teaching board", () => {
+  assert.match(chatPage, /value: "classroom"/);
+  assert.match(chatPage, /runtimeCapabilityValue\(cap\.value\)/);
+  assert.match(chatPage, /classroomTurnPendingRef/);
+  assert.match(composer, /autoOpenKey=\{boardAutoOpenKey\}/);
+});

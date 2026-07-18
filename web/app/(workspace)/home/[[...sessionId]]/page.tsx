@@ -26,6 +26,7 @@ import {
   MessageSquare,
   Microscope,
   PenLine,
+  Presentation,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
@@ -109,7 +110,10 @@ import {
   selectedBooksToPayload,
   type SelectedBookReference,
 } from "@/lib/book-references";
-import { capabilityVisible } from "@/lib/experience-mode";
+import {
+  capabilityVisible,
+  runtimeCapabilityValue,
+} from "@/lib/experience-mode";
 
 const NotebookRecordPicker = dynamic(
   () => import("@/components/notebook/NotebookRecordPicker"),
@@ -221,6 +225,25 @@ const CAPABILITIES: CapabilityDef[] = [
     label: "Chat",
     description: "Flexible conversation with any tool",
     icon: MessageSquare,
+    allowedTools: [
+      "brainstorm",
+      "geogebra_analysis",
+      "web_search",
+      "code_execution",
+      "reason",
+      "paper_search",
+      "imagegen",
+      "videogen",
+    ],
+    defaultTools: [],
+  },
+  {
+    value: "classroom",
+    label: "Classroom",
+    description: "Teach each answer on the interactive board",
+    icon: Presentation,
+    // Classroom reuses the normal chat agent. The frontend presents each
+    // completed response with the existing teaching-board renderer.
     allowedTools: [
       "brainstorm",
       "geogebra_analysis",
@@ -425,6 +448,9 @@ export default function ChatPage() {
     null,
   );
   const [capMenuOpen, setCapMenuOpen] = useState(false);
+  const [classroomMode, setClassroomMode] = useState(false);
+  const [boardAutoOpenKey, setBoardAutoOpenKey] = useState(0);
+  const classroomTurnPendingRef = useRef(false);
   const [quizConfig, setQuizConfig] = useState<DeepQuestionFormConfig>({
     ...DEFAULT_QUIZ_CONFIG,
   });
@@ -567,8 +593,11 @@ export default function ChatPage() {
   }, [handlePrefillComposer]);
 
   const activeCap = useMemo(
-    () => getCapability(state.activeCapability),
-    [state.activeCapability],
+    () =>
+      classroomMode
+        ? getCapability("classroom")
+        : getCapability(state.activeCapability),
+    [classroomMode, state.activeCapability],
   );
   const availableCapabilities = useMemo(
     () =>
@@ -653,6 +682,13 @@ export default function ChatPage() {
     }
     return "";
   }, [state.messages]);
+  useEffect(() => {
+    if (state.isStreaming || !classroomTurnPendingRef.current) return;
+    classroomTurnPendingRef.current = false;
+    if (classroomMode && latestAssistantContent) {
+      setBoardAutoOpenKey((value) => value + 1);
+    }
+  }, [classroomMode, latestAssistantContent, state.isStreaming]);
   const practiceRequested = searchParams.get("practice") === "1";
 
   // The mobile Practice destination opens the ordinary tutor and prepares a
@@ -1162,13 +1198,15 @@ export default function ChatPage() {
         availableCapabilities.find((c) => c.value === value) ??
         availableCapabilities[0] ??
         CAPABILITIES[0];
-      const storageKey = cap.value || "chat";
+      const runtimeValue = runtimeCapabilityValue(cap.value);
+      const storageKey = runtimeValue || "chat";
       const config = resolveCapabilityPlaygroundConfig(
         capabilityConfigs,
         storageKey,
         cap.allowedTools,
       );
-      setCapability(cap.value || null);
+      setClassroomMode(cap.value === "classroom");
+      setCapability(runtimeValue || null);
       // Per-capability tool selection now derives from the user's saved
       // settings (/settings/tools) intersected with the capability's
       // allow-list. Playground-saved configs still override when the user
@@ -1540,6 +1578,7 @@ export default function ChatPage() {
       // Persona is NOT passed per-call here: it is a session-level
       // preference (state.personaSelection) that sendMessage resolves and
       // sends with every turn.
+      if (classroomMode) classroomTurnPendingRef.current = true;
       sendMessage(
         messageContent,
         extraAttachments,
@@ -1563,6 +1602,7 @@ export default function ChatPage() {
     [
       attachments,
       bookReferencesPayload,
+      classroomMode,
       historyReferencesPayload,
       isQuizMode,
       isResearchMode,
@@ -2061,11 +2101,14 @@ export default function ChatPage() {
               onCancelStreaming={cancelStreamingTurn}
               prefillInputRef={prefillInputRef}
               inputPlaceholder={
-                isStudentExperience
+                classroomMode
+                  ? t("Ask what you want Drona to teach on the board...")
+                  : isStudentExperience
                   ? t("Ask a question in Hindi, English or your regional language...")
                   : undefined
               }
               latestAssistantContent={latestAssistantContent}
+              boardAutoOpenKey={boardAutoOpenKey}
             />
             <div
               aria-hidden="true"

@@ -9,6 +9,7 @@ import {
   knowledgeLabel,
   normalizeExperienceMode,
   primaryNavVisible,
+  runtimeCapabilityValue,
   secondaryNavVisible,
   settingsCategoryVisible,
   workspaceLabel,
@@ -36,13 +37,18 @@ test("student mode keeps learning and personal-material surfaces", () => {
   );
 });
 
-test("student mode offers normal chat and quizzes only", () => {
+test("student mode preserves learning capabilities and adds classroom", () => {
   assert.equal(capabilityVisible("student", ""), true);
+  assert.equal(capabilityVisible("student", "classroom"), true);
+  assert.equal(capabilityVisible("student", "deep_solve"), true);
   assert.equal(capabilityVisible("student", "deep_question"), true);
-  assert.equal(capabilityVisible("student", "deep_research"), false);
-  assert.equal(capabilityVisible("student", "visualize"), false);
+  assert.equal(capabilityVisible("student", "deep_research"), true);
+  assert.equal(capabilityVisible("student", "visualize"), true);
+  assert.equal(capabilityVisible("student", "mastery_path"), true);
   assert.equal(capabilityLabel("student", "", "Chat"), "Drona Tutor");
   assert.equal(capabilityLabel("student", "deep_question", "Quiz"), "Quiz");
+  assert.equal(runtimeCapabilityValue("classroom"), "");
+  assert.equal(runtimeCapabilityValue("visualize"), "visualize");
   assert.equal(
     capabilityDescription("student", "", "Flexible conversation"),
     "Ask naturally with course materials and tutor guidance",
