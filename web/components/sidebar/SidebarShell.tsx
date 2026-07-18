@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   Github,
+  GraduationCap,
   HeartHandshake,
   House,
   LayoutGrid,
@@ -118,6 +119,16 @@ const SECONDARY_NAV: NavEntry[] = [
     label: "Knowledge Center",
     icon: BookOpen,
     tooltipKey: "Knowledge tooltip",
+  },
+  {
+    // Curriculum: browse standard curriculum templates (e.g. ICAR B.Sc.
+    // Agriculture) and manage the academic structure — departments, programs,
+    // subjects with syllabi. Never gated — structure management needs no
+    // per-user model grant.
+    href: "/curriculum",
+    label: "Curriculum",
+    icon: GraduationCap,
+    tooltipKey: "Curriculum tooltip",
   },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
