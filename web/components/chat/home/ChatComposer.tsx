@@ -974,7 +974,7 @@ export default memo(function ChatComposer({
                     onBudgetChange={onSubagentBudgetChange}
                   />
                 ) : null}
-                {experienceMode !== "student" && knowledgeBases.length > 0 ? (
+                {knowledgeBases.length > 0 ? (
                   <KnowledgeSelector
                     knowledgeBases={knowledgeBases}
                     selected={selectedKnowledgeBases}
