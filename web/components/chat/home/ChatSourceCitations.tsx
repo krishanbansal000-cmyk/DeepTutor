@@ -1,11 +1,14 @@
 "use client";
 
-import { BookOpen, FileText } from "lucide-react";
+import { BookOpen, ExternalLink, FileText, Globe } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MessageAttachment } from "@/context/UnifiedChatContext";
-import { collectRagCitations } from "@/lib/chat-sources";
+import {
+  collectRagCitations,
+  collectWebCitations,
+} from "@/lib/chat-sources";
 import { knowledgeBaseFilePath } from "@/lib/knowledge-api";
 import type { StreamEvent } from "@/lib/unified-ws";
 
@@ -25,24 +28,25 @@ export default function ChatSourceCitations({
   onOpen?: (attachment: MessageAttachment) => void;
 }) {
   const { t } = useTranslation();
-  const citations = useMemo(
+  const ragCitations = useMemo(
     () => collectRagCitations(events, answer),
     [answer, events],
   );
+  const webCitations = useMemo(() => collectWebCitations(events), [events]);
 
-  if (!citations.length) return null;
+  if (!ragCitations.length && !webCitations.length) return null;
 
   return (
     <section
       id="references"
-      className="mb-3 rounded-xl border border-[var(--border)]/70 bg-[var(--card)]/70 px-3 py-2.5"
+      className="mt-4 mb-3 rounded-xl border border-[var(--border)]/70 bg-[var(--card)]/70 px-3 py-2.5"
     >
       <div className="mb-2 flex items-center gap-1.5 text-[11.5px] font-medium text-[var(--muted-foreground)]">
         <BookOpen size={13} strokeWidth={1.7} />
         <span>{t("Sources used")}</span>
       </div>
       <div className="flex flex-wrap gap-2">
-        {citations.map((citation, index) => {
+        {ragCitations.map((citation, index) => {
           const firstPage = citation.pages[0];
           const fileUrl = knowledgeBaseFilePath(
             citation.kbName,
@@ -93,6 +97,55 @@ export default function ChatSourceCitations({
             <a
               key={`${citation.kbName}:${citation.filename}:${citation.citationId}`}
               href={previewUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2.5 py-1.5 text-[11.5px] text-[var(--foreground)] no-underline"
+            >
+              {content}
+            </a>
+          );
+        })}
+        {webCitations.map((citation, webIndex) => {
+          const index = ragCitations.length + webIndex;
+          const openSource = () =>
+            onOpen?.({
+              type: "file",
+              filename: citation.title,
+              mime_type: "text/html",
+              url: citation.url,
+              id: `web-source:${citation.url}`,
+            });
+          const content = (
+            <>
+              <span className="font-mono text-[10px] font-semibold text-[var(--primary)]">
+                [{index + 1}]
+              </span>
+              <Globe
+                size={13}
+                className="shrink-0 text-[var(--muted-foreground)]"
+              />
+              <span className="max-w-[260px] truncate">{citation.title}</span>
+              <ExternalLink
+                size={11}
+                className="shrink-0 text-[var(--muted-foreground)]"
+              />
+            </>
+          );
+
+          return onOpen ? (
+            <button
+              key={citation.url}
+              type="button"
+              onClick={openSource}
+              className="inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2.5 py-1.5 text-[11.5px] text-[var(--foreground)] transition-colors hover:border-[var(--primary)]/40 hover:bg-[var(--primary)]/[0.04]"
+              title={t("Open source")}
+            >
+              {content}
+            </button>
+          ) : (
+            <a
+              key={citation.url}
+              href={citation.url}
               target="_blank"
               rel="noreferrer"
               className="inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2.5 py-1.5 text-[11.5px] text-[var(--foreground)] no-underline"

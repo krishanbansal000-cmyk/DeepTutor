@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { collectRagCitations } from "../lib/chat-sources";
+import {
+  collectRagCitations,
+  collectWebCitations,
+} from "../lib/chat-sources";
 import type { StreamEvent } from "../lib/unified-ws";
 
 function sourcesEvent(sources: Array<Record<string, unknown>>): StreamEvent {
@@ -77,4 +80,19 @@ test("collectRagCitations orders cards by citation appearance in the answer", ()
     citations.map((citation) => citation.filename),
     ["second.pdf", "first.pdf"],
   );
+});
+
+test("collectWebCitations updates from search events and de-duplicates URLs", () => {
+  const citations = collectWebCitations([
+    sourcesEvent([
+      { type: "web", url: "https://example.test/a", title: "First" },
+      { type: "web", url: "https://example.test/a", title: "Duplicate" },
+      { type: "web", url: "https://example.test/b", title: "Second" },
+    ]),
+  ]);
+
+  assert.deepEqual(citations, [
+    { url: "https://example.test/a", title: "First" },
+    { url: "https://example.test/b", title: "Second" },
+  ]);
 });

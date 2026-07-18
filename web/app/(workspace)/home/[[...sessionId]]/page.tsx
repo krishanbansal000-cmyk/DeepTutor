@@ -36,6 +36,7 @@ import type { SelectedHistorySession } from "@/components/chat/HistorySessionPic
 import type { SelectedQuestionEntry } from "@/components/chat/QuestionBankPicker";
 import ChatComposer from "@/components/chat/home/ChatComposer";
 import { ChatMessageList } from "@/components/chat/home/ChatMessages";
+import ClassroomWorkspace from "@/components/student/ClassroomWorkspace";
 import SessionLoadingView from "@/components/chat/home/SessionLoadingView";
 // Imported eagerly so the drawer shell is always mounted off-screen —
 // clicking a chip becomes a single CSS class flip, no chunk fetch + double
@@ -449,8 +450,6 @@ export default function ChatPage() {
   );
   const [capMenuOpen, setCapMenuOpen] = useState(false);
   const [classroomMode, setClassroomMode] = useState(false);
-  const [boardAutoOpenKey, setBoardAutoOpenKey] = useState(0);
-  const classroomTurnPendingRef = useRef(false);
   const [quizConfig, setQuizConfig] = useState<DeepQuestionFormConfig>({
     ...DEFAULT_QUIZ_CONFIG,
   });
@@ -682,13 +681,33 @@ export default function ChatPage() {
     }
     return "";
   }, [state.messages]);
-  useEffect(() => {
-    if (state.isStreaming || !classroomTurnPendingRef.current) return;
-    classroomTurnPendingRef.current = false;
-    if (classroomMode && latestAssistantContent) {
-      setBoardAutoOpenKey((value) => value + 1);
+  const classroomAssistant = useMemo(() => {
+    let latestUserIndex = -1;
+    for (let index = state.messages.length - 1; index >= 0; index -= 1) {
+      if (state.messages[index].role === "user") {
+        latestUserIndex = index;
+        break;
+      }
     }
-  }, [classroomMode, latestAssistantContent, state.isStreaming]);
+    for (
+      let index = state.messages.length - 1;
+      index > latestUserIndex;
+      index -= 1
+    ) {
+      const message = state.messages[index];
+      if (message.role === "assistant") return message;
+    }
+    return null;
+  }, [state.messages]);
+  const latestUserQuestion = useMemo(() => {
+    for (let index = state.messages.length - 1; index >= 0; index -= 1) {
+      const message = state.messages[index];
+      if (message.role === "user" && message.content.trim()) {
+        return message.content;
+      }
+    }
+    return "";
+  }, [state.messages]);
   const practiceRequested = searchParams.get("practice") === "1";
 
   // The mobile Practice destination opens the ordinary tutor and prepares a
@@ -1578,7 +1597,6 @@ export default function ChatPage() {
       // Persona is NOT passed per-call here: it is a session-level
       // preference (state.personaSelection) that sendMessage resolves and
       // sends with every turn.
-      if (classroomMode) classroomTurnPendingRef.current = true;
       sendMessage(
         messageContent,
         extraAttachments,
@@ -1602,7 +1620,6 @@ export default function ChatPage() {
     [
       attachments,
       bookReferencesPayload,
-      classroomMode,
       historyReferencesPayload,
       isQuizMode,
       isResearchMode,
@@ -1960,9 +1977,17 @@ export default function ChatPage() {
             </div>}
           </div>
           )}
-          <div className="mx-auto flex w-full max-w-[960px] flex-1 min-h-0 flex-col overflow-hidden px-6">
+          <div className="mx-auto flex w-full max-w-[960px] flex-1 min-h-0 flex-col overflow-hidden px-3 sm:px-6">
             {sessionLoading ? (
               <SessionLoadingView onCancel={cancelSessionLoad} />
+            ) : classroomMode ? (
+              <ClassroomWorkspace
+                question={latestUserQuestion}
+                content={classroomAssistant?.content ?? ""}
+                events={classroomAssistant?.events ?? []}
+                isStreaming={state.isStreaming}
+                onOpenSource={handlePreviewMessageAttachment}
+              />
             ) : !hasMessages ? (
               <div className="flex flex-1 min-h-0 flex-col items-center justify-end pb-14 animate-fade-in">
                 <div className="flex items-center justify-center gap-4">
@@ -2107,8 +2132,9 @@ export default function ChatPage() {
                   ? t("Ask a question in Hindi, English or your regional language...")
                   : undefined
               }
-              latestAssistantContent={latestAssistantContent}
-              boardAutoOpenKey={boardAutoOpenKey}
+              latestAssistantContent={
+                classroomMode ? undefined : latestAssistantContent
+              }
             />
             <div
               aria-hidden="true"

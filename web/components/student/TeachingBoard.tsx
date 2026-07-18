@@ -13,7 +13,14 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import AssistantResponse from "@/components/common/AssistantResponse";
@@ -28,27 +35,13 @@ import {
 export default function TeachingBoardButton({
   content,
   variant = "message",
-  autoOpenKey = 0,
 }: {
   content: string;
   variant?: "message" | "composer";
-  autoOpenKey?: number;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const lastAutoOpenKeyRef = useRef(0);
   const steps = useMemo(() => lessonStepsFromMarkdown(content), [content]);
-
-  useEffect(() => {
-    if (
-      autoOpenKey > 0 &&
-      autoOpenKey !== lastAutoOpenKeyRef.current &&
-      steps.length > 0
-    ) {
-      setOpen(true);
-    }
-    lastAutoOpenKeyRef.current = autoOpenKey;
-  }, [autoOpenKey, steps.length]);
 
   if (!steps.length) return null;
   return (
@@ -79,14 +72,22 @@ export default function TeachingBoardButton({
   );
 }
 
-function TeachingBoard({
+export function TeachingBoard({
   title,
   steps,
   onClose,
+  embedded = false,
+  streaming = false,
+  activity,
+  supplementary,
 }: {
   title: string;
   steps: string[];
-  onClose: () => void;
+  onClose?: () => void;
+  embedded?: boolean;
+  streaming?: boolean;
+  activity?: ReactNode;
+  supplementary?: ReactNode;
 }) {
   const { t } = useTranslation();
   const [current, setCurrent] = useState(0);
@@ -111,10 +112,11 @@ function TeachingBoard({
   const close = useCallback(() => {
     setPlaying(false);
     stopAudio();
-    onClose();
+    onClose?.();
   }, [onClose, stopAudio]);
 
   useEffect(() => {
+    if (embedded) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
@@ -128,7 +130,15 @@ function TeachingBoard({
       document.body.style.overflow = previous;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [close, steps.length]);
+  }, [close, embedded, steps.length]);
+
+  useEffect(() => {
+    if (streaming) {
+      setCurrent(Math.max(0, steps.length - 1));
+      return;
+    }
+    setCurrent((value) => Math.min(value, Math.max(0, steps.length - 1)));
+  }, [steps.length, streaming]);
 
   useEffect(() => {
     if (!playing) return;
@@ -184,12 +194,16 @@ function TeachingBoard({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
+      role={embedded ? "region" : "dialog"}
+      aria-modal={embedded ? undefined : true}
       aria-label={t("Teaching board")}
-      className="fixed inset-0 z-[120] flex flex-col bg-[var(--background)]"
+      className={
+        embedded
+          ? "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)] shadow-sm"
+          : "fixed inset-0 z-[120] flex flex-col bg-[var(--background)]"
+      }
     >
-      <header className="flex min-h-16 items-center gap-3 border-b border-[var(--border)] bg-[var(--card)] px-4 sm:px-6">
+      <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--card)] px-3 sm:min-h-16 sm:px-6">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#183b5b] text-white">
           <Presentation size={19} />
         </span>
@@ -213,17 +227,25 @@ function TeachingBoard({
             {greenBoard ? t("White board") : t("Green board")}
           </span>
         </button>
-        <button
-          type="button"
-          onClick={close}
-          className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)]"
-          aria-label={t("Close board")}
-        >
-          <X size={19} />
-        </button>
+        {!embedded && (
+          <button
+            type="button"
+            onClick={close}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)]"
+            aria-label={t("Close board")}
+          >
+            <X size={19} />
+          </button>
+        )}
       </header>
 
-      <div className="flex items-center gap-1.5 border-b border-[var(--border)] bg-[var(--card)] px-4 py-2 sm:px-6">
+      {activity ? (
+        <div className="max-h-[34%] shrink-0 overflow-y-auto border-b border-[var(--border)] bg-[var(--card)] px-3 pt-2 sm:px-6">
+          {activity}
+        </div>
+      ) : null}
+
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-[var(--border)] bg-[var(--card)] px-3 py-2 sm:px-6">
         {steps.map((_, index) => (
           <span
             key={index}
@@ -237,34 +259,38 @@ function TeachingBoard({
         </span>
       </div>
 
-      <main className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-4 sm:p-8">
-        <article
-          className={`teaching-board-surface relative w-full max-w-4xl rounded-xl px-5 py-7 shadow-[0_16px_48px_rgba(46,38,30,0.18)] sm:min-h-[420px] sm:px-10 sm:py-10 ${
-            greenBoard ? "teaching-board-green" : "teaching-board-white"
-          }`}
-        >
-          {steps.slice(0, current + 1).map((step, index) => (
-            <section
-              key={`${index}-${step.slice(0, 32)}`}
-              className={`teaching-board-step ${
-                index === current ? "teaching-board-step-active" : ""
-              }`}
-            >
-              <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.09em] opacity-65">
-                <span>{t("Step")}</span>
-                <span>{index + 1}</span>
-              </div>
-              <AssistantResponse
-                content={step}
-                className="text-[17px] leading-[1.8] sm:text-[19px]"
-              />
-            </section>
-          ))}
-          <div ref={boardEndRef} aria-hidden="true" />
-        </article>
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6">
+        <div className="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-4">
+          <article
+            className={`teaching-board-surface relative min-w-0 w-full overflow-x-hidden rounded-xl px-4 py-6 shadow-[0_16px_48px_rgba(46,38,30,0.18)] sm:min-h-[360px] sm:px-10 sm:py-10 ${
+              greenBoard ? "teaching-board-green" : "teaching-board-white"
+            }`}
+          >
+            {steps.slice(0, current + 1).map((step, index) => (
+              <section
+                key={`${index}-${step.slice(0, 32)}`}
+                className={`teaching-board-step min-w-0 ${
+                  index === current ? "teaching-board-step-active" : ""
+                }`}
+              >
+                <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.09em] opacity-65">
+                  <span>{t("Step")}</span>
+                  <span>{index + 1}</span>
+                </div>
+                <AssistantResponse
+                  content={step}
+                  isStreaming={streaming && index === current}
+                  className="min-w-0 text-[17px] leading-[1.8] sm:text-[19px]"
+                />
+              </section>
+            ))}
+            <div ref={boardEndRef} aria-hidden="true" />
+          </article>
+          {supplementary}
+        </div>
       </main>
 
-      <footer className="flex min-h-[76px] items-center justify-between gap-3 border-t border-[var(--border)] bg-[var(--card)] px-4 py-3 sm:px-6">
+      <footer className="flex min-h-[68px] shrink-0 items-center justify-between gap-2 border-t border-[var(--border)] bg-[var(--card)] px-3 py-2 sm:min-h-[76px] sm:px-6 sm:py-3">
         <button
           type="button"
           onClick={() => setCurrent((value) => Math.max(0, value - 1))}

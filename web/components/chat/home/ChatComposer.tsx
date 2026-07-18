@@ -227,7 +227,6 @@ export default memo(function ChatComposer({
   prefillInputRef,
   inputPlaceholder,
   latestAssistantContent,
-  boardAutoOpenKey,
 }: {
   composerRef: RefObject<HTMLDivElement | null>;
   capMenuRef: RefObject<HTMLDivElement | null>;
@@ -337,8 +336,6 @@ export default memo(function ChatComposer({
   inputPlaceholder?: string;
   /** Latest completed answer, exposed as a classroom-board action in chat. */
   latestAssistantContent?: string;
-  /** Opens a newly completed Classroom answer on the teaching board. */
-  boardAutoOpenKey?: number;
 }) {
   const { t } = useTranslation();
   const { experienceMode } = useAppShell();
@@ -968,7 +965,6 @@ export default memo(function ChatComposer({
                   <TeachingBoardButton
                     content={latestAssistantContent}
                     variant="composer"
-                    autoOpenKey={boardAutoOpenKey}
                   />
                 ) : null}
                 {advancedExperience &&

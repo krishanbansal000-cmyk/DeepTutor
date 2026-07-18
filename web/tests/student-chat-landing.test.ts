@@ -11,6 +11,14 @@ const composer = readFileSync(
   path.join(process.cwd(), "components/chat/home/ChatComposer.tsx"),
   "utf8",
 );
+const classroom = readFileSync(
+  path.join(process.cwd(), "components/student/ClassroomWorkspace.tsx"),
+  "utf8",
+);
+const teachingBoard = readFileSync(
+  path.join(process.cwd(), "components/student/TeachingBoard.tsx"),
+  "utf8",
+);
 
 test("Ask Drona keeps the compact chat landing instead of a student dashboard", () => {
   assert.doesNotMatch(chatPage, /StudentTutorWelcome|StudentCourseStrip/);
@@ -34,9 +42,13 @@ test("Drona Tutor remains a selectable student mode", () => {
   );
 });
 
-test("Classroom reuses chat and opens completed answers on the teaching board", () => {
+test("Classroom reuses chat and renders answers inside the teaching board", () => {
   assert.match(chatPage, /value: "classroom"/);
   assert.match(chatPage, /runtimeCapabilityValue\(cap\.value\)/);
-  assert.match(chatPage, /classroomTurnPendingRef/);
-  assert.match(composer, /autoOpenKey=\{boardAutoOpenKey\}/);
+  assert.match(chatPage, /<ClassroomWorkspace/);
+  assert.match(classroom, /<TeachingBoard/);
+  assert.match(classroom, /supplementary=/);
+  assert.match(teachingBoard, /embedded/);
+  assert.match(teachingBoard, /overflow-x-hidden/);
+  assert.doesNotMatch(classroom, /autoOpen/);
 });

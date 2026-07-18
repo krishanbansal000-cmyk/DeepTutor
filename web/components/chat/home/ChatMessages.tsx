@@ -1382,11 +1382,6 @@ export const ChatMessageList = memo(function ChatMessageList({
 
         return (
           <div key={`${msg.role}-${i}`} className="w-full">
-            <ChatSourceCitations
-              events={msg.events ?? []}
-              answer={msg.content}
-              onOpen={onPreviewAttachment}
-            />
             <InlineFileCardProvider
               attachments={msg.attachments ?? []}
               events={msg.events}
@@ -1405,6 +1400,11 @@ export const ChatMessageList = memo(function ChatMessageList({
                 }
               />
             </InlineFileCardProvider>
+            <ChatSourceCitations
+              events={msg.events ?? []}
+              answer={msg.content}
+              onOpen={onPreviewAttachment}
+            />
             <GeneratedFileCards
               attachments={msg.attachments ?? []}
               events={msg.events}

@@ -7,6 +7,11 @@ export type RagCitation = {
   pages: string[];
 };
 
+export type WebCitation = {
+  url: string;
+  title: string;
+};
+
 function basename(value: string): string {
   return value.split(/[\\/]/).filter(Boolean).pop() ?? value;
 }
@@ -67,4 +72,29 @@ export function collectRagCitations(
     const bOrder = citedOrder.get(b.citationId.toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
     return aOrder - bOrder;
   });
+}
+
+/** Collect web-search sources incrementally, de-duplicated by URL. */
+export function collectWebCitations(events: StreamEvent[]): WebCitation[] {
+  const citations = new Map<string, WebCitation>();
+
+  for (const event of events) {
+    if (event.type !== "sources") continue;
+    const sources = Array.isArray(event.metadata?.sources)
+      ? event.metadata.sources
+      : [];
+    for (const raw of sources) {
+      if (!raw || typeof raw !== "object") continue;
+      const source = raw as Record<string, unknown>;
+      if (source.type !== "web") continue;
+      const url = String(source.url ?? "").trim();
+      if (!url || citations.has(url)) continue;
+      citations.set(url, {
+        url,
+        title: String(source.title ?? source.source ?? url).trim() || url,
+      });
+    }
+  }
+
+  return [...citations.values()];
 }
