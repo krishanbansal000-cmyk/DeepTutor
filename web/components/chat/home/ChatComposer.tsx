@@ -19,7 +19,6 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
-  GraduationCap,
   Loader2,
   MessageSquare,
   Mic,
@@ -47,7 +46,11 @@ import ChatSpaceMenu from "@/components/chat/space/ChatSpaceMenu";
 import type { SpaceMemoryFile } from "@/lib/space-items";
 import type { SelectedBookReference } from "@/lib/book-references";
 import { useAppShell } from "@/context/AppShellContext";
-import { isAdvancedExperience } from "@/lib/experience-mode";
+import {
+  capabilityDescription,
+  capabilityLabel,
+  isAdvancedExperience,
+} from "@/lib/experience-mode";
 import AgentSelector from "./AgentSelector";
 import KnowledgeSelector from "./KnowledgeSelector";
 import ModelSelector from "./ModelSelector";
@@ -107,7 +110,14 @@ function CapMenuItem({
   onSelect: (value: string) => void;
 }) {
   const { t } = useTranslation();
+  const { experienceMode } = useAppShell();
   const Icon = cap.icon;
+  const label = capabilityLabel(experienceMode, cap.value, cap.label);
+  const description = capabilityDescription(
+    experienceMode,
+    cap.value,
+    cap.description,
+  );
   return (
     <button
       type="button"
@@ -123,10 +133,10 @@ function CapMenuItem({
       />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[12.5px] font-medium leading-snug text-[var(--foreground)]">
-          {t(cap.label)}
+          {t(label)}
         </div>
         <div className="truncate text-[11px] leading-snug text-[var(--muted-foreground)]">
-          {t(cap.description)}
+          {t(description)}
         </div>
       </div>
       {selected && (
@@ -331,6 +341,11 @@ export default memo(function ChatComposer({
   const { experienceMode } = useAppShell();
   const advancedExperience = isAdvancedExperience(experienceMode);
   const CapIcon = activeCap.icon;
+  const activeCapLabel = capabilityLabel(
+    experienceMode,
+    activeCap.value,
+    activeCap.label,
+  );
 
   const [hasContent, setHasContent] = useState(false);
   const [moreCapsOpen, setMoreCapsOpen] = useState(false);
@@ -764,16 +779,6 @@ export default memo(function ChatComposer({
               on hover. */}
           <div className="px-3 pb-2 pt-0.5">
             <div className="flex items-center gap-1">
-              {experienceMode === "student" ? (
-                <div className="inline-flex h-8 shrink-0 items-center gap-1.5 px-2 text-[14px] font-semibold text-[var(--foreground)]">
-                  <GraduationCap
-                    size={17}
-                    strokeWidth={1.8}
-                    className="text-[var(--primary)]"
-                  />
-                  {composerCompact ? null : <span>{t("Drona Tutor")}</span>}
-                </div>
-              ) : (
               <div className="relative">
                 <button
                   ref={capBtnRef}
@@ -787,7 +792,7 @@ export default memo(function ChatComposer({
                   <span className="flex min-w-0 items-center gap-1.5">
                     <CapIcon size={16} strokeWidth={1.7} className="shrink-0" />
                     {composerCompact ? null : (
-                      <span className="truncate">{t(activeCap.label)}</span>
+                      <span className="truncate">{t(activeCapLabel)}</span>
                     )}
                   </span>
                   <ChevronDown
@@ -897,7 +902,6 @@ export default memo(function ChatComposer({
                   </div>
                 )}
               </div>
-              )}
 
               <div className="relative flex min-w-0 flex-1 items-center">
                 <button

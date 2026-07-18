@@ -70,6 +70,29 @@ export function capabilityVisible(
   );
 }
 
+export function capabilityLabel(
+  mode: ExperienceMode,
+  capability: string,
+  fallback: string,
+): string {
+  if (mode === "student" && capability === "") return "Drona Tutor";
+  return fallback;
+}
+
+export function capabilityDescription(
+  mode: ExperienceMode,
+  capability: string,
+  fallback: string,
+): string {
+  if (mode === "student" && capability === "") {
+    return "Ask naturally with course materials and tutor guidance";
+  }
+  if (mode === "student" && capability === "deep_question") {
+    return "Create a practice quiz from your course material";
+  }
+  return fallback;
+}
+
 export function chatSpaceItemVisible(
   mode: ExperienceMode,
   item: ChatSpaceItemKey,

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   capabilityVisible,
+  capabilityDescription,
+  capabilityLabel,
   chatSpaceItemVisible,
   knowledgeLabel,
   normalizeExperienceMode,
@@ -39,6 +41,12 @@ test("student mode offers normal chat and quizzes only", () => {
   assert.equal(capabilityVisible("student", "deep_question"), true);
   assert.equal(capabilityVisible("student", "deep_research"), false);
   assert.equal(capabilityVisible("student", "visualize"), false);
+  assert.equal(capabilityLabel("student", "", "Chat"), "Drona Tutor");
+  assert.equal(capabilityLabel("student", "deep_question", "Quiz"), "Quiz");
+  assert.equal(
+    capabilityDescription("student", "", "Flexible conversation"),
+    "Ask naturally with course materials and tutor guidance",
+  );
 });
 
 test("teacher mode adds course authoring and research", () => {

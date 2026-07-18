@@ -24,3 +24,12 @@ test("students select course material from the compact composer", () => {
     /experienceMode !== "student" && knowledgeBases\.length > 0/,
   );
 });
+
+test("Drona Tutor remains a selectable student mode", () => {
+  assert.match(composer, /capabilityLabel\(/);
+  assert.match(composer, /onSetCapMenuOpen/);
+  assert.doesNotMatch(
+    composer,
+    /experienceMode === "student" \? \(\s*<div[^>]*>\s*<GraduationCap/,
+  );
+});
