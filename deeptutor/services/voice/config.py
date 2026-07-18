@@ -37,6 +37,7 @@ class TTSConfig:
     api_version: str | None = None
     extra_headers: dict[str, str] = field(default_factory=dict)
     voice: str = ""
+    language: str | None = None
     response_format: str = "mp3"
     speed: float | None = None
     max_input_chars: int = DEFAULT_MAX_INPUT_CHARS

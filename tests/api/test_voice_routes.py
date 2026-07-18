@@ -12,6 +12,7 @@ import pytest
 
 from deeptutor.api.routers import voice as voice_router
 from deeptutor.services.voice import VoiceProviderError
+from deeptutor.services.voice.base import TTSStream
 
 
 @pytest.fixture()
@@ -58,6 +59,31 @@ def test_tts_wraps_pcm_bytes_as_browser_playable_wav(
         assert wav.getnchannels() == 1
         assert wav.getsampwidth() == 2
         assert wav.readframes(wav.getnframes()) == pcm
+
+
+def test_tts_stream_returns_pcm_chunks_and_audio_metadata(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_stream(text: str, *, voice=None, language=None, **_: Any):
+        captured.update(text=text, voice=voice, language=language)
+        return TTSStream(chunks=iter([b"first", b"second"]), sample_rate=22_050)
+
+    monkeypatch.setattr(voice_router, "stream_speech", fake_stream)
+    resp = client.post(
+        "/api/v1/voice/tts/stream",
+        json={"text": "Namaste", "language": "hi"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.content == b"firstsecond"
+    assert resp.headers["content-type"].startswith("audio/pcm")
+    assert resp.headers["x-audio-sample-rate"] == "22050"
+    assert resp.headers["x-audio-channels"] == "1"
+    assert resp.headers["x-audio-sample-width"] == "2"
+    assert captured == {"text": "Namaste", "voice": None, "language": "hi"}
 
 
 def test_tts_rejects_empty_text(client: TestClient) -> None:

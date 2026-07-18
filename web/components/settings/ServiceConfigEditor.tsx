@@ -957,6 +957,8 @@ function ProfileFields({
   const fields =
     service === "search"
       ? searchProviderFields(profile.provider)
+      : service === "tts" && providerValue === "piper"
+        ? { apiKey: false, baseUrl: false, baseUrlRequired: false }
       : { apiKey: true, baseUrl: true, baseUrlRequired: false };
   const searxngMissingBaseUrl =
     fields.baseUrlRequired && !String(profile.base_url || "").trim();

@@ -1,0 +1,4 @@
+# DeepTutor local Piper TTS addon. Mirrors pyproject.toml `voice-piper`.
+# Voice ONNX files are downloaded separately into data/models/piper.
+
+piper-tts>=1.5.0,<2.0.0

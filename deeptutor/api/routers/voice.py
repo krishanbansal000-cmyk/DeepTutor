@@ -13,10 +13,12 @@ import logging
 import wave
 
 from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from deeptutor.services.voice import (
     VoiceProviderError,
+    stream_speech,
     synthesize_speech,
     transcribe_audio,
 )
@@ -38,6 +40,7 @@ class TTSRequest(BaseModel):
     text: str = Field(..., min_length=1)
     voice: str | None = None
     format: str | None = None
+    language: str | None = None
 
 
 def _parse_pcm_content_type(content_type: str) -> tuple[int, int] | None:
@@ -83,6 +86,7 @@ async def text_to_speech(payload: TTSRequest) -> Response:
             payload.text,
             voice=payload.voice,
             response_format=payload.format,
+            language=payload.language,
         )
     except ValueError as exc:  # missing/invalid configuration
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -98,6 +102,34 @@ async def text_to_speech(payload: TTSRequest) -> Response:
         content=audio,
         media_type=content_type,
         headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.post("/tts/stream")
+async def stream_text_to_speech(payload: TTSRequest) -> StreamingResponse:
+    """Stream local PCM16 speech as soon as Piper finishes each sentence."""
+    try:
+        audio = await stream_speech(
+            payload.text,
+            voice=payload.voice,
+            language=payload.language,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except VoiceProviderError as exc:
+        logger.warning("Streaming TTS provider error: %s", exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    return StreamingResponse(
+        audio.chunks,
+        media_type=audio.content_type,
+        headers={
+            "Cache-Control": "no-store",
+            "X-Accel-Buffering": "no",
+            "X-Audio-Sample-Rate": str(audio.sample_rate),
+            "X-Audio-Channels": str(audio.channels),
+            "X-Audio-Sample-Width": str(audio.sample_width),
+        },
     )
 
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from deeptutor.services.config.provider_runtime import (
     resolve_llm_runtime_config,
     resolve_search_runtime_config,
@@ -73,6 +75,30 @@ def test_llm_explicit_binding_and_headers() -> None:
     assert resolved.provider_mode == "standard"
     assert resolved.effective_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
     assert resolved.extra_headers == {"APP-Code": "abc"}
+
+
+def test_llm_resolves_opencode_style_environment_placeholders(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TEST_LLM_API_KEY", "secret-from-environment")
+    monkeypatch.setenv("TEST_LLM_BASE_URL", "https://gateway.example/v1")
+    catalog = _build_catalog(
+        llm_profile={
+            "id": "llm-p",
+            "name": "Environment-backed LLM",
+            "binding": "custom",
+            "base_url": "{env:TEST_LLM_BASE_URL}",
+            "api_key": "{env:TEST_LLM_API_KEY}",
+            "api_version": "",
+            "extra_headers": {},
+            "models": [{"id": "llm-m", "name": "m", "model": "test-model"}],
+        }
+    )
+
+    resolved = resolve_llm_runtime_config(catalog=catalog)
+
+    assert resolved.api_key == "secret-from-environment"
+    assert resolved.effective_url == "https://gateway.example/v1"
 
 
 def test_llm_api_key_prefix_gateway() -> None:

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
+import os
+import re
 from typing import Any
 from urllib.parse import urlparse
 
@@ -219,6 +221,14 @@ class VoiceProviderSpec:
 # of these; bespoke providers (DashScope native, ElevenLabs, Gemini, Deepgram)
 # would register their own ``adapter`` value once implemented.
 TTS_PROVIDERS: dict[str, VoiceProviderSpec] = {
+    "piper": VoiceProviderSpec(
+        label="Piper (Local English + Hindi)",
+        default_api_base="",
+        adapter="piper_local",
+        default_model="piper-local",
+        default_voice="auto",
+        is_local=True,
+    ),
     "openai": VoiceProviderSpec(
         label="OpenAI",
         default_api_base="https://api.openai.com/v1",
@@ -509,6 +519,25 @@ def _as_str(value: Any) -> str:
     return str(value).strip() if value is not None else ""
 
 
+def _resolve_env_placeholder(value: Any) -> str:
+    """Resolve ``{env:VAR}`` placeholders in a config string.
+
+    Mirrors the OpenCode ``{env:NAME}`` convention so a profile can point at
+    an environment variable (e.g. ``"api_key": "{env:OPENCODE_GO_API_KEY}"``)
+    instead of hardcoding the secret. Unknown / unset variables resolve to an
+    empty string so callers fall back to their normal "no key" path.
+    """
+    text = _as_str(value)
+    if not text or "{env:" not in text:
+        return text
+
+    def _sub(match: "re.Match[str]") -> str:
+        name = match.group(1).strip()
+        return os.environ.get(name, "") if name else ""
+
+    return re.sub(r"\{env:([A-Za-z_][A-Za-z0-9_]*)\}", _sub, text).strip()
+
+
 def _to_headers(value: Any) -> dict[str, str]:
     if isinstance(value, dict):
         return {str(k): str(v) for k, v in value.items() if str(k).strip() and v is not None}
@@ -558,9 +587,9 @@ def _collect_provider_pool(catalog: dict[str, Any]) -> dict[str, NormalizedProvi
             continue
         providers[name] = NormalizedProviderConfig(
             name=name,
-            api_key=_as_str(profile.get("api_key")),
-            api_base=_as_str(profile.get("base_url")) or None,
-            api_version=_as_str(profile.get("api_version")) or None,
+            api_key=_resolve_env_placeholder(profile.get("api_key")),
+            api_base=_resolve_env_placeholder(profile.get("base_url")) or None,
+            api_version=_resolve_env_placeholder(profile.get("api_version")) or None,
             extra_headers=_to_headers(profile.get("extra_headers")) or None,
         )
     return providers
@@ -635,9 +664,9 @@ def resolve_llm_runtime_config(
     binding_hint_raw = _as_str((profile or {}).get("binding"))
     binding_hint = canonical_provider_name(binding_hint_raw)
 
-    active_api_key = _as_str((profile or {}).get("api_key"))
-    active_api_base = _as_str((profile or {}).get("base_url"))
-    active_api_version = _as_str((profile or {}).get("api_version"))
+    active_api_key = _resolve_env_placeholder((profile or {}).get("api_key"))
+    active_api_base = _resolve_env_placeholder((profile or {}).get("base_url"))
+    active_api_version = _resolve_env_placeholder((profile or {}).get("api_version"))
     reasoning_effort = _as_str((model or {}).get("reasoning_effort")) or None
     vision_model = _as_str((model or {}).get("vision_model")) or _as_str(
         (profile or {}).get("vision_model")
@@ -708,9 +737,9 @@ def _collect_embedding_provider_pool(
             continue
         providers[name] = NormalizedProviderConfig(
             name=name,
-            api_key=_as_str(profile.get("api_key")),
-            api_base=_as_str(profile.get("base_url")) or None,
-            api_version=_as_str(profile.get("api_version")) or None,
+            api_key=_resolve_env_placeholder(profile.get("api_key")),
+            api_base=_resolve_env_placeholder(profile.get("base_url")) or None,
+            api_version=_resolve_env_placeholder(profile.get("api_version")) or None,
             extra_headers=_to_headers(profile.get("extra_headers")) or None,
         )
     return providers
@@ -817,9 +846,9 @@ def resolve_embedding_runtime_config(
     binding_hint_raw = _as_str((profile or {}).get("binding"))
     binding_hint = _canonical_embedding_provider_name(binding_hint_raw)
 
-    active_api_key = _as_str((profile or {}).get("api_key"))
-    active_api_base = _as_str((profile or {}).get("base_url"))
-    active_api_version = _as_str((profile or {}).get("api_version"))
+    active_api_key = _resolve_env_placeholder((profile or {}).get("api_key"))
+    active_api_base = _resolve_env_placeholder((profile or {}).get("base_url"))
+    active_api_version = _resolve_env_placeholder((profile or {}).get("api_version"))
     active_extra_headers = _to_headers((profile or {}).get("extra_headers"))
     # Default 0 means "not yet known" — the test_runner auto-fills on first
     # successful connection. Adapters/clients should treat 0 as "let the
@@ -908,6 +937,7 @@ def resolve_tts_runtime_config(
         api_version=_as_str((profile or {}).get("api_version")) or None,
         extra_headers=_to_headers((profile or {}).get("extra_headers")),
         voice=voice,
+        language=_as_str((model or {}).get("language")) or None,
         response_format=response_format,
         speed=_coerce_optional_float((model or {}).get("speed")),
     )
@@ -1075,9 +1105,9 @@ def resolve_search_runtime_config(
 
     requested_provider = (_as_str(profile.get("provider")) or "duckduckgo").lower()
     provider = requested_provider
-    api_key = _as_str(profile.get("api_key"))
-    base_url = _as_str(profile.get("base_url"))
-    proxy = _as_str(profile.get("proxy")) or None
+    api_key = _resolve_env_placeholder(profile.get("api_key"))
+    base_url = _resolve_env_placeholder(profile.get("base_url"))
+    proxy = _resolve_env_placeholder(profile.get("proxy")) or None
     max_results = _resolve_search_max_results(loaded)
 
     deprecated = provider in DEPRECATED_SEARCH_PROVIDERS

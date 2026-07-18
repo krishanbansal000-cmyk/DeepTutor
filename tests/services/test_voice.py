@@ -24,6 +24,11 @@ from deeptutor.services.voice.adapters.openai_compat import (
     OpenAICompatTTSAdapter,
     OpenRouterTTSAdapter,
 )
+from deeptutor.services.voice.adapters.piper_local import (
+    DEFAULT_ENGLISH_VOICE,
+    DEFAULT_HINDI_VOICE,
+    PiperLocalTTSAdapter,
+)
 from deeptutor.services.voice.base import (
     build_auth_headers,
     join_audio_path,
@@ -325,6 +330,56 @@ def test_resolve_tts_config_picks_openrouter_adapter() -> None:
     cfg = resolve_tts_runtime_config(catalog=catalog)
     assert cfg.provider_name == "openrouter"
     assert cfg.adapter == "openrouter_tts"
+
+
+def test_resolve_tts_config_picks_local_piper_adapter() -> None:
+    catalog = _voice_catalog()
+    profile = catalog["services"]["tts"]["profiles"][0]
+    profile["binding"] = "piper"
+    profile["api_key"] = ""
+    profile["models"][0].update(
+        {"model": "piper-local", "voice": "auto", "language": "hi"}
+    )
+
+    cfg = resolve_tts_runtime_config(catalog=catalog)
+
+    assert cfg.provider_name == "piper"
+    assert cfg.adapter == "piper_local"
+    assert cfg.base_url == ""
+    assert cfg.voice == "auto"
+    assert cfg.language == "hi"
+
+
+def test_piper_auto_voice_routes_english_hindi_and_regional_languages() -> None:
+    adapter = PiperLocalTTSAdapter()
+    config = TTSConfig(model="piper-local", voice="auto", language="en")
+    assert adapter._resolve_voice_id(config) == DEFAULT_ENGLISH_VOICE
+
+    for language in ("hi", "hi-IN", "bundeli", "awadhi", "bhojpuri"):
+        config.language = language
+        assert adapter._resolve_voice_id(config) == DEFAULT_HINDI_VOICE
+
+
+def test_piper_prepare_stream_exposes_voice_sample_rate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeVoiceConfig:
+        sample_rate = 22_050
+
+    class FakeVoice:
+        config = FakeVoiceConfig()
+
+    adapter = PiperLocalTTSAdapter()
+    monkeypatch.setattr(adapter, "_load_voice", lambda _voice_id: FakeVoice())
+    stream = adapter.prepare_stream(
+        "Namaste",
+        TTSConfig(model="piper-local", voice="hindi", language="hi"),
+    )
+
+    assert stream.sample_rate == 22_050
+    assert stream.channels == 1
+    assert stream.sample_width == 2
+    assert stream.content_type == "audio/pcm"
 
 
 def test_resolve_tts_config_raises_without_model() -> None:

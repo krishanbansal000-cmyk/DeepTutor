@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 import logging
 import re
+from typing import Iterable
 
 from deeptutor.services.voice.config import (
     AUTH_API_KEY_HEADER,
@@ -29,6 +31,17 @@ class VoiceProviderHTTPError(VoiceProviderError):
         self.body = body
 
 
+@dataclass(slots=True)
+class TTSStream:
+    """Raw PCM stream prepared by a local text-to-speech adapter."""
+
+    chunks: Iterable[bytes]
+    sample_rate: int
+    channels: int = 1
+    sample_width: int = 2
+    content_type: str = "audio/pcm"
+
+
 class BaseTTSAdapter(ABC):
     """Abstract text-to-speech adapter."""
 
@@ -40,6 +53,12 @@ class BaseTTSAdapter(ABC):
             ``(audio_bytes, content_type)`` — content type is best-effort, e.g.
             ``audio/mpeg`` for mp3.
         """
+
+    def prepare_stream(self, text: str, config: TTSConfig) -> TTSStream:
+        """Prepare a streaming response, if this adapter supports it."""
+        raise VoiceProviderError(
+            f"The active TTS provider ({config.provider_name}) does not support local PCM streaming."
+        )
 
 
 class BaseSTTAdapter(ABC):
@@ -136,6 +155,7 @@ def strip_markdown_for_speech(text: str, *, max_chars: int = 0) -> str:
 __all__ = [
     "VoiceProviderError",
     "VoiceProviderHTTPError",
+    "TTSStream",
     "BaseTTSAdapter",
     "BaseSTTAdapter",
     "build_auth_headers",
