@@ -3,6 +3,10 @@
 Piper is imported lazily so DeepTutor continues to run without the optional
 ``voice-piper`` extra. Voice files live in the ignored runtime-data tree at
 ``data/models/piper`` and are loaded once per backend process.
+
+If Piper's espeakbridge DLL is blocked by Windows Application Control policy
+(AppLocker/WDAC), the adapter falls back to pyttsx3 (Windows SAPI5 speech
+engine) so Drona can still speak in classroom mode.
 """
 
 from __future__ import annotations
@@ -12,6 +16,8 @@ from collections.abc import Iterator
 import logging
 from pathlib import Path
 import re
+import tempfile
+import os
 from threading import Lock
 from typing import Any
 
@@ -23,6 +29,10 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_ENGLISH_VOICE = "en_US-kristin-medium"
 DEFAULT_HINDI_VOICE = "hi_IN-priyamvada-medium"
+
+# Set to True when Piper's espeakbridge DLL fails to load (Windows AppLocker).
+# Once set, all synthesis falls back to pyttsx3 (Windows SAPI5 built-in speech).
+_piper_blocked: bool | None = None
 
 _VOICE_ALIASES = {
     "en": DEFAULT_ENGLISH_VOICE,
@@ -57,16 +67,63 @@ class PiperLocalTTSAdapter(BaseTTSAdapter):
         return (self._model_dir or (get_runtime_data_root() / "models" / "piper")).resolve()
 
     async def synthesize(self, text: str, config: TTSConfig) -> tuple[bytes, str]:
-        stream = await asyncio.to_thread(self.prepare_stream, text, config)
-        audio = await asyncio.to_thread(lambda: b"".join(stream.chunks))
-        if not audio:
-            raise VoiceProviderError("Piper returned empty audio.")
-        content_type = (
-            f"audio/pcm;rate={stream.sample_rate};channels={stream.channels}"
-        )
-        return audio, content_type
+        global _piper_blocked
+        # Check if Piper's espeakbridge is blocked; if so, use pyttsx3 fallback.
+        if _piper_blocked is None:
+            _piper_blocked = _check_piper_blocked()
+        if _piper_blocked:
+            return await _pyttsx3_synthesize(text, config)
+        try:
+            stream = await asyncio.to_thread(self.prepare_stream, text, config)
+            audio = await asyncio.to_thread(lambda: b"".join(stream.chunks))
+            if not audio:
+                raise VoiceProviderError("Piper returned empty audio.")
+            content_type = (
+                f"audio/pcm;rate={stream.sample_rate};channels={stream.channels}"
+            )
+            return audio, content_type
+        except VoiceProviderError as exc:
+            if "espeakbridge" in str(exc).lower() or "Application Control" in str(exc):
+                logger.warning("Piper espeakbridge blocked — falling back to pyttsx3 (Windows SAPI5)")
+                _piper_blocked = True
+                return await _pyttsx3_synthesize(text, config)
+            raise
 
     def prepare_stream(self, text: str, config: TTSConfig) -> TTSStream:
+        global _piper_blocked
+        if _piper_blocked is None:
+            _piper_blocked = _check_piper_blocked()
+        if _piper_blocked:
+            # pyttsx3 doesn't support streaming — return the whole WAV as
+            # a single chunk so the StreamingResponse can still iterate it.
+            import wave, io
+            tmp_fd, tmp_path = tempfile.mkstemp(suffix=".wav")
+            os.close(tmp_fd)
+            try:
+                import pyttsx3
+                engine = pyttsx3.init()
+                speed = config.speed if config.speed and config.speed > 0 else 1.0
+                engine.setProperty("rate", int(200 * speed))
+                engine.save_to_file(text, tmp_path)
+                engine.runAndWait()
+                with wave.open(tmp_path, "rb") as wav:
+                    sample_rate = wav.getframerate()
+                    channels = wav.getnchannels()
+                    frames = wav.readframes(wav.getnframes())
+                audio_bytes = frames
+            except Exception as exc:
+                raise VoiceProviderError(f"pyttsx3 streaming fallback failed: {exc}") from exc
+            finally:
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+            return TTSStream(
+                chunks=iter([audio_bytes]),
+                sample_rate=sample_rate,
+                channels=channels,
+                sample_width=2,
+            )
         voice_id = self._resolve_voice_id(config)
         voice = self._load_voice(voice_id)
         sample_rate = int(voice.config.sample_rate)
@@ -151,6 +208,92 @@ class PiperLocalTTSAdapter(BaseTTSAdapter):
             raise
         except Exception as exc:
             raise VoiceProviderError(f"Piper synthesis failed: {exc}") from exc
+
+
+def _check_piper_blocked() -> bool:
+    """Probe whether Piper's espeakbridge DLL can be loaded.
+
+    Returns True when the DLL is blocked by Windows Application Control policy
+    (AppLocker/WDAC). In that case, all synthesis falls back to pyttsx3.
+    """
+    try:
+        # Importing espeakbridge triggers the DLL load. On Windows with
+        # AppLocker, this raises ImportError with "Application Control" in
+        # the message, or OSError — we catch both.
+        from piper import espeakbridge  # noqa: F401
+        try:
+            espeakbridge.initialize()
+        except Exception:
+            return True
+        return False
+    except ImportError as exc:
+        if "Application Control" in str(exc) or "DLL load failed" in str(exc):
+            logger.warning("Piper espeakbridge DLL blocked — using pyttsx3 (Windows SAPI5) fallback for TTS")
+            return True
+        # piper not installed at all — let the normal error path handle it.
+        return False
+    except OSError:
+        logger.warning("Piper espeakbridge DLL blocked — using pyttsx3 (Windows SAPI5) fallback for TTS")
+        return True
+    except Exception:
+        return False
+
+
+async def _pyttsx3_synthesize(text: str, config: TTSConfig) -> tuple[bytes, str]:
+    """Fallback TTS using Windows SAPI5 speech engine via pyttsx3.
+
+    Generates a WAV file and returns the bytes. This is used when Piper's
+    espeakbridge DLL is blocked by Windows Application Control policy.
+    """
+    def _do_synthesize() -> tuple[bytes, str]:
+        try:
+            import pyttsx3
+        except ImportError as exc:
+            raise VoiceProviderError(
+                "Neither Piper nor pyttsx3 is available. "
+                "Run: pip install -e \".[voice-piper]\" or pip install pyttsx3"
+            ) from exc
+
+        engine = pyttsx3.init()
+        # Set rate (speed). pyttsx3 rate is words-per-minute; default ~200.
+        speed = config.speed if config.speed and config.speed > 0 else 1.0
+        engine.setProperty("rate", int(200 * speed))
+
+        # Try to set a voice matching the language.
+        language = (config.language or "").strip().lower()
+        voices = engine.getProperty("voices")
+        if voices:
+            if language.startswith("hi") or language in {"hindi", "bundeli", "awadhi", "bhojpuri"}:
+                # Look for a Hindi voice in SAPI5
+                for v in voices:
+                    if "hindi" in v.name.lower() or "hi" in v.id.lower():
+                        engine.setProperty("voice", v.id)
+                        break
+            else:
+                # Default to first English voice
+                for v in voices:
+                    if "english" in v.name.lower() or "en" in v.id.lower():
+                        engine.setProperty("voice", v.id)
+                        break
+
+        # Save to a temp WAV file
+        tmp_fd, tmp_path = tempfile.mkstemp(suffix=".wav")
+        os.close(tmp_fd)
+        try:
+            engine.save_to_file(text, tmp_path)
+            engine.runAndWait()
+            with open(tmp_path, "rb") as f:
+                audio = f.read()
+            if not audio:
+                raise VoiceProviderError("pyttsx3 returned empty audio.")
+            return audio, "audio/wav"
+        finally:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+    return await asyncio.to_thread(_do_synthesize)
 
 
 __all__ = [

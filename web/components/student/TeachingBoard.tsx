@@ -273,22 +273,37 @@ export function TeachingBoard({
   // This is the heart of the auto-play flow: when playing is true and audio
   // is idle, speak the current step. The `current` dependency means it re-
   // fires after each advancement, speaking the next section.
+  //
+  // IMPORTANT: We do NOT abort in the cleanup. The previous version aborted
+  // the controller when `audioState` changed from "idle" to "loading" (which
+  // happens immediately inside speakStep), killing the TTS fetch before it
+  // could respond. Instead, we use a ref guard to prevent double-invocation,
+  // and rely on stopAudio() (called when `current` changes) to abort the
+  // previous step's audio.
+  const speakingInitiatedRef = useRef(false);
   useEffect(() => {
-    if (!playing) return;
+    if (!playing) {
+      speakingInitiatedRef.current = false;
+      return;
+    }
     if (atEnd && audioState === "idle") {
-      // Already at the last step and nothing is playing — we're done.
-      // (The advanceOrFinish callback also handles this, but this catches
-      // the case where the last step's audio just finished.)
+      speakingInitiatedRef.current = false;
       return;
     }
     if (audioState !== "idle") return;
+    if (speakingInitiatedRef.current) return;
+    speakingInitiatedRef.current = true;
     const controller = new AbortController();
     audioAbortRef.current = controller;
     void speakStep(current, controller.signal);
-    return () => {
-      controller.abort();
-    };
+    // No cleanup abort — stopAudio() handles that when current changes.
   }, [atEnd, audioState, current, playing, speakStep]);
+
+  // Reset the speaking guard when the step changes so the new step can
+  // initiate its own TTS request.
+  useEffect(() => {
+    speakingInitiatedRef.current = false;
+  }, [current]);
 
   // Cleanup audio on unmount.
   useEffect(() => stopAudio, [stopAudio]);
