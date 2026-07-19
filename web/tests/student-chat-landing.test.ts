@@ -60,14 +60,18 @@ test("Classroom reuses chat and renders answers inside the teaching board", () =
   assert.match(classroom, /checkpointPending=/);
   assert.match(classroom, /supplementary=/);
   assert.match(classroom, /isStreaming \? \(/);
+  assert.match(classroom, /autoPlay=/);
   assert.match(teachingBoard, /embedded/);
   assert.match(teachingBoard, /overflow-x-hidden/);
   assert.match(teachingBoard, /ref=\{boardScrollRef\}/);
-  assert.match(teachingBoard, /content=\{currentStep\}/);
+  // Continuous transcript: all steps rendered via map, not just currentStep
+  assert.match(teachingBoard, /steps\.map\(\(step, index\)/);
+  assert.match(teachingBoard, /content=\{step\}/);
+  assert.match(teachingBoard, /autoPlay/);
+  assert.match(teachingBoard, /scrollIntoView/);
   assert.match(teachingBoard, /checkpointPending/);
   assert.match(chatPage, /classroom_mode: true/);
   assert.match(chatPage, /onSubmitUserReply=\{submitUserReply\}/);
-  assert.doesNotMatch(teachingBoard, /scrollIntoView/);
   assert.doesNotMatch(teachingBoard, /steps\.slice\(0, current \+ 1\)/);
   assert.doesNotMatch(classroom, /autoOpen/);
 });
