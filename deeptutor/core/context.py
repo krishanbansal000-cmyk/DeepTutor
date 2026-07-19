@@ -16,7 +16,7 @@ from typing import Any
 class Attachment:
     """A file or image attached to the user message."""
 
-    type: str  # "image" | "file" | "pdf"
+    type: str  # "image" | "file" | "pdf" | "audio"
     url: str = ""
     base64: str = ""
     filename: str = ""

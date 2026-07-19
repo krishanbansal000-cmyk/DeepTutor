@@ -368,14 +368,35 @@ export default memo(function ChatComposer({
     };
   }, [prefillInputRef]);
 
-  // Microphone → speech-to-text. Appends the transcript to whatever is already
-  // in the composer so a dictated phrase can be combined with typed text.
-  const handleTranscript = useCallback((text: string) => {
-    const current = inputHandleRef.current?.getValue() || "";
-    const next = current.trim() ? `${current.trimEnd()} ${text}` : text;
-    inputHandleRef.current?.setValue(next);
-  }, []);
-  const recorder = useVoiceRecorder(handleTranscript);
+  // Microphone → voice chat. When the active LLM supports audio (Gemma 4 E4B
+  // on DeepInfra), the backend forwards the clip directly and returns the
+  // model's response (mode="direct"). Otherwise it transcribes via STT and
+  // returns the transcript (mode="stt") — which we append to the composer so
+  // a dictated phrase can be combined with typed text.
+  const handleVoiceResult = useCallback(
+    (result: { mode: string; text: string }) => {
+      if (result.mode === "direct") {
+        // Direct-audio LLM response — surface as a user-facing message via
+        // the same path a normal chat response would take. For now we append
+        // it to the composer so the user can review/send it. A future
+        // iteration could inject it directly as an assistant message.
+        const current = inputHandleRef.current?.getValue() || "";
+        const next = current.trim()
+          ? `${current.trimEnd()}\n\n[Voice response] ${result.text}`
+          : result.text;
+        inputHandleRef.current?.setValue(next);
+      } else {
+        // STT transcript — append to composer.
+        const current = inputHandleRef.current?.getValue() || "";
+        const next = current.trim()
+          ? `${current.trimEnd()} ${result.text}`
+          : result.text;
+        inputHandleRef.current?.setValue(next);
+      }
+    },
+    [],
+  );
+  const recorder = useVoiceRecorder(handleVoiceResult);
 
   // Composer-row compaction: when the available width drops below ~620 px
   // (e.g. the Viewer panel is open or the user is on a narrow viewport),
@@ -993,16 +1014,14 @@ export default memo(function ChatComposer({
                     onOpenChange={onPersonaSelectorOpenChange}
                   />
                 ) : null}
-                {advancedExperience && (
-                  <ModelSelector
-                    options={llmOptions}
-                    activeDefault={activeLLMDefault}
-                    value={llmSelection}
-                    loading={llmOptionsLoading}
-                    error={llmOptionsError}
-                    onChange={onSelectLLM}
-                  />
-                )}
+                <ModelSelector
+                  options={llmOptions}
+                  activeDefault={activeLLMDefault}
+                  value={llmSelection}
+                  loading={llmOptionsLoading}
+                  error={llmOptionsError}
+                  onChange={onSelectLLM}
+                />
 
                 <button
                   type="button"

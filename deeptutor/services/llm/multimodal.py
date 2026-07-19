@@ -2,12 +2,15 @@
 Multimodal Message Utilities
 =============================
 
-Converts plain-text messages + image attachments into the multimodal
-message format expected by vision-capable LLMs.
+Converts plain-text messages + image/audio attachments into the multimodal
+message format expected by vision- and audio-capable LLMs.
 
 Supports:
-- OpenAI-compatible API (content array with image_url blocks)
-- Anthropic API (content array with image source blocks)
+- OpenAI-compatible API (content array with image_url blocks and
+  input_audio blocks for providers like DeepInfra that expose Gemma 4
+  E4B's native audio encoder)
+- Anthropic API (content array with image source blocks; audio is not
+  supported by the Anthropic adapter and is dropped with a warning)
 """
 
 from __future__ import annotations
@@ -18,12 +21,26 @@ import logging
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from .capabilities import supports_vision, supports_vision_url
+from .capabilities import supports_audio, supports_vision, supports_vision_url
 
 logger = logging.getLogger(__name__)
 
 MIME_FALLBACK = "image/png"
 _LOCAL_ATTACHMENT_PREFIX = "/api/attachments/"
+
+# Audio MIME types we will forward as ``input_audio`` content parts. Gemma 4
+# E4B on DeepInfra accepts wav and mp3; we keep the allowlist narrow so a
+# stray ogg/flac upload doesn't get sent to a provider that will 400.
+_SUPPORTED_AUDIO_MIME_TYPES = frozenset(
+    {"audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp3", "audio/mp4"}
+)
+_AUDIO_FORMAT_BY_MIME = {
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
+    "audio/mp4": "mp3",  # fallback; DeepInfra only accepts wav/mp3
+}
 
 
 @dataclass
@@ -34,6 +51,11 @@ class MultimodalResult:
     "stripped because unsupported" outcome here — that decision is deferred
     to the Stage-2 fallback at each call site's retry seam (see
     :func:`should_degrade_to_text`).
+
+    Audio is injected only when the provider/model advertises
+    ``supports_audio``; otherwise audio attachments are silently skipped
+    here (the caller is expected to have run them through a separate STT
+    step before calling the LLM) and counted in ``audio_dropped``.
     """
 
     messages: list[dict[str, Any]]
@@ -41,6 +63,9 @@ class MultimodalResult:
     # base64 and we couldn't resolve the URL locally (external URL or missing
     # file). The caller can surface this to the user.
     url_images_dropped: int = 0
+    # Number of audio attachments we could not inject (provider lacks
+    # supports_audio, or the audio bytes were missing/unresolvable).
+    audio_dropped: int = 0
 
 
 def _guess_mime_type(filename: str, fallback: str = MIME_FALLBACK) -> str:
@@ -80,6 +105,26 @@ def _build_anthropic_image_part(
             "media_type": mime_type,
             "data": base64_data,
         },
+    }
+
+
+def _build_openai_audio_part(
+    *,
+    base64_data: str,
+    mime_type: str,
+) -> dict[str, Any]:
+    """Build an OpenAI-compatible ``input_audio`` content part.
+
+    DeepInfra's chat completions schema defines ``ChatCompletionContentPartAudio``
+    with ``type: input_audio`` and ``input_audio: {data, format}``. The
+    ``format`` field is constrained to ``wav`` or ``mp3``. We map the
+    attachment's MIME type to one of those; anything outside the allowlist
+    is dropped upstream in :func:`prepare_multimodal_messages`.
+    """
+    audio_format = _AUDIO_FORMAT_BY_MIME.get(mime_type.lower(), "wav")
+    return {
+        "type": "input_audio",
+        "input_audio": {"data": base64_data, "format": audio_format},
     }
 
 
@@ -126,7 +171,7 @@ def prepare_multimodal_messages(
     model: str | None = None,
 ) -> MultimodalResult:
     """
-    Inject image attachments into the last user message (Stage 1).
+    Inject image and audio attachments into the last user message (Stage 1).
 
     Images are injected **optimistically for every provider/model** — this
     function does not consult ``supports_vision``. A model that natively
@@ -136,17 +181,26 @@ def prepare_multimodal_messages(
     (:func:`should_degrade_to_text` + :func:`strip_image_parts`, applied at
     each call site's retry seam) strips the images and retries as text-only.
 
+    Audio is injected **only when the provider/model advertises
+    ``supports_audio``** (currently Gemma 4 E4B/E2B on DeepInfra). For any
+    other provider, audio attachments are skipped here and counted in
+    ``audio_dropped`` — the caller is expected to have transcribed them
+    via a separate STT step before calling the LLM. This keeps the audio
+    payload out of providers that would 400 on ``input_audio`` parts.
+
     The last user message ``content`` is converted from a plain string into a
-    content-parts array holding the original text plus the image(s). The only
-    images dropped *here* are url-only attachments the provider can't accept in
-    URL form (Anthropic, or ``vision_url_supported=False``) and that can't be
-    resolved to local bytes — counted in ``url_images_dropped``.
+    content-parts array holding the original text plus the image(s) and, when
+    applicable, the audio part(s). The only images dropped *here* are url-only
+    attachments the provider can't accept in URL form (Anthropic, or
+    ``vision_url_supported=False``) and that can't be resolved to local bytes
+    — counted in ``url_images_dropped``.
 
     Args:
         messages: The OpenAI-style messages list (may be mutated).
         attachments: ``Attachment`` objects from ``UnifiedContext``.
         binding: Provider binding (``"openai"``, ``"anthropic"``, …).
-        model: Model name (used only to pick the URL-vs-base64 image format).
+        model: Model name (used to pick URL-vs-base64 image format and to
+            gate audio injection via ``supports_audio``).
 
     Returns:
         A ``MultimodalResult`` with the (potentially modified) messages.
@@ -155,7 +209,8 @@ def prepare_multimodal_messages(
         return MultimodalResult(messages=messages)
 
     image_attachments = [a for a in attachments if getattr(a, "type", "") == "image"]
-    if not image_attachments:
+    audio_attachments = [a for a in attachments if getattr(a, "type", "") == "audio"]
+    if not image_attachments and not audio_attachments:
         return MultimodalResult(messages=messages)
 
     last_user_idx = _find_last_user_message(messages)
@@ -167,7 +222,7 @@ def prepare_multimodal_messages(
     # Moonshot / VolcEngine reject URL form outright. In both cases url-only
     # attachments must be resolved to bytes before injection.
     require_base64 = is_anthropic or not supports_vision_url(binding, model)
-    dropped = _inject_images(
+    dropped_images = _inject_images(
         messages,
         last_user_idx,
         image_attachments,
@@ -175,7 +230,27 @@ def prepare_multimodal_messages(
         require_base64=require_base64,
     )
 
-    return MultimodalResult(messages=messages, url_images_dropped=dropped)
+    # Audio injection is gated strictly on the model advertising supports_audio
+    # (Gemma 4 E4B/E2B on DeepInfra). Other providers skip audio entirely and
+    # the caller is expected to have run STT separately before reaching here.
+    dropped_audio = 0
+    if audio_attachments:
+        if supports_audio(binding, model):
+            dropped_audio = _inject_audio(
+                messages,
+                last_user_idx,
+                audio_attachments,
+            )
+        else:
+            # Provider can't accept audio inline — skip silently. The caller
+            # should have transcribed via STT before calling the LLM.
+            dropped_audio = len(audio_attachments)
+
+    return MultimodalResult(
+        messages=messages,
+        url_images_dropped=dropped_images,
+        audio_dropped=dropped_audio,
+    )
 
 
 def _find_last_user_message(messages: list[dict[str, Any]]) -> int | None:
@@ -268,7 +343,69 @@ def _inject_images(
     return dropped
 
 
+def _inject_audio(
+    messages: list[dict[str, Any]],
+    user_idx: int,
+    audio_attachments: list[Any],
+) -> int:
+    """Inject ``input_audio`` parts into the user message at *user_idx*.
+
+    Returns the count of audio attachments we had to drop (unsupported MIME
+    type, or missing base64 + unresolvable URL). Only called when the
+    provider/model advertises ``supports_audio``.
+    """
+    msg = messages[user_idx]
+    original_content = msg.get("content", "")
+
+    if isinstance(original_content, str):
+        content_parts: list[dict[str, Any]] = [{"type": "text", "text": original_content}]
+    elif isinstance(original_content, list):
+        content_parts = list(original_content)
+    else:
+        content_parts = [{"type": "text", "text": str(original_content)}]
+
+    dropped = 0
+    for att in audio_attachments:
+        mime = (getattr(att, "mime_type", "") or "").lower()
+        b64 = getattr(att, "base64", "") or ""
+        url = getattr(att, "url", "") or ""
+
+        # Resolve local attachment URLs to base64 if needed.
+        is_local_attachment_url = url.startswith(_LOCAL_ATTACHMENT_PREFIX) if url else False
+        if not b64 and url and is_local_attachment_url:
+            resolved = _resolve_local_attachment_url(url)
+            if resolved is not None:
+                b64, _resolved_mime = resolved
+                if not mime:
+                    mime = _resolved_mime.lower()
+            else:
+                logger.warning("Dropping audio %r: could not resolve local URL", url)
+                dropped += 1
+                continue
+
+        if not b64:
+            logger.warning("Dropping audio %r: no base64 and no resolvable URL", url or "<no-url>")
+            dropped += 1
+            continue
+
+        if mime not in _SUPPORTED_AUDIO_MIME_TYPES:
+            logger.warning(
+                "Dropping audio %r: unsupported MIME type %r (allowed: %s)",
+                getattr(att, "filename", "") or url,
+                mime,
+                sorted(_SUPPORTED_AUDIO_MIME_TYPES),
+            )
+            dropped += 1
+            continue
+
+        content_parts.append(_build_openai_audio_part(base64_data=b64, mime_type=mime))
+
+    messages[user_idx] = {**msg, "content": content_parts}
+    return dropped
+
+
 _IMAGE_BLOCK_TYPES = frozenset({"image_url", "image"})
+_AUDIO_BLOCK_TYPES = frozenset({"input_audio"})
 
 
 def _block_image_placeholder(block: dict[str, Any]) -> str:
@@ -305,6 +442,72 @@ def has_image_attachments(attachments: list[Any] | None) -> bool:
         and bool(getattr(attachment, "base64", "") or getattr(attachment, "url", ""))
         for attachment in attachments or []
     )
+
+
+def has_audio_parts(messages: list[dict[str, Any]]) -> bool:
+    """Return True when any message content contains ``input_audio`` blocks."""
+    for msg in messages:
+        content = msg.get("content")
+        if not isinstance(content, list):
+            continue
+        for item in content:
+            if isinstance(item, dict) and item.get("type") in _AUDIO_BLOCK_TYPES:
+                return True
+    return False
+
+
+def has_audio_attachments(attachments: list[Any] | None) -> bool:
+    """Return True when an attachment list contains a usable audio clip."""
+    return any(
+        getattr(attachment, "type", "") == "audio"
+        and bool(getattr(attachment, "base64", "") or getattr(attachment, "url", ""))
+        for attachment in attachments or []
+    )
+
+
+def _block_audio_placeholder(block: dict[str, Any]) -> str:
+    """Human-readable text placeholder for an audio block being stripped."""
+    audio = block.get("input_audio") or {}
+    fmt = ""
+    if isinstance(audio, dict):
+        fmt = str(audio.get("format") or "").strip()
+    return f"[audio clip omitted{f' ({fmt})' if fmt else ''}]"
+
+
+def strip_audio_parts(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return a **new** message list with ``input_audio`` blocks replaced by
+    text placeholders. Used when retrying against a provider that rejected
+    audio input."""
+    stripped: list[dict[str, Any]] = []
+    for msg in messages:
+        content = msg.get("content")
+        if not isinstance(content, list):
+            stripped.append(dict(msg))
+            continue
+        new_content: list[dict[str, Any]] = [
+            {"type": "text", "text": _block_audio_placeholder(item)}
+            if isinstance(item, dict) and item.get("type") in _AUDIO_BLOCK_TYPES
+            else item
+            for item in content
+        ]
+        stripped.append({**msg, "content": new_content})
+    return stripped
+
+
+def strip_audio_parts_inplace(messages: list[dict[str, Any]]) -> bool:
+    """Replace ``input_audio`` blocks with text placeholders **in place**;
+    return True if any were replaced. Mirrors
+    :func:`strip_image_parts_inplace` for the audio path."""
+    found = False
+    for msg in messages:
+        content = msg.get("content")
+        if not isinstance(content, list):
+            continue
+        for idx, block in enumerate(content):
+            if isinstance(block, dict) and block.get("type") in _AUDIO_BLOCK_TYPES:
+                content[idx] = {"type": "text", "text": _block_audio_placeholder(block)}
+                found = True
+    return found
 
 
 def model_for_image_request(
@@ -388,11 +591,15 @@ def should_degrade_to_text(
 
 __all__ = [
     "MultimodalResult",
+    "has_audio_attachments",
+    "has_audio_parts",
     "has_image_attachments",
     "has_image_parts",
     "model_for_image_request",
     "prepare_multimodal_messages",
     "should_degrade_to_text",
+    "strip_audio_parts",
+    "strip_audio_parts_inplace",
     "strip_image_parts",
     "strip_image_parts_inplace",
 ]

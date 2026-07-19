@@ -268,7 +268,9 @@ class LLMProvider(ABC):
         **kwargs: Any,
     ) -> LLMResponse:
         from deeptutor.services.llm.multimodal import (
+            has_audio_parts,
             has_image_parts,
+            strip_audio_parts,
             strip_image_parts,
             strip_image_parts_inplace,
         )
@@ -322,6 +324,30 @@ class LLMProvider(ABC):
                     )
                     if retry_response.finish_reason != "error":
                         strip_image_parts_inplace(messages)
+                    return retry_response
+                # Stage-2 audio fallback: mirror the image path for input_audio
+                # blocks. Degrade to text-only when the model rejected audio.
+                if allow_image_fallback and has_audio_parts(messages):
+                    logger.warning(
+                        "Non-transient LLM error with audio content; retrying"
+                        " once without audio parts"
+                    )
+                    retry_response = await call(
+                        messages=strip_audio_parts(messages),
+                        tools=tools,
+                        model=model,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        reasoning_effort=reasoning_effort,
+                        tool_choice=tool_choice,
+                        **kwargs,
+                    )
+                    if retry_response.finish_reason != "error":
+                        from deeptutor.services.llm.multimodal import (
+                            strip_audio_parts_inplace,
+                        )
+
+                        strip_audio_parts_inplace(messages)
                     return retry_response
                 return response
 

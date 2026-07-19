@@ -211,6 +211,16 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=True,
         thinking_style="thinking_type",
     ),
+    ProviderSpec(
+        name="deepinfra",
+        keywords=("deepinfra",),
+        env_key="DEEPINFRA_API_KEY",
+        display_name="DeepInfra",
+        backend="openai_compat",
+        is_gateway=True,
+        detect_by_base_keyword="deepinfra",
+        default_api_base="https://api.deepinfra.com/v1/openai",
+    ),
     # === Standard providers (matched by model-name keywords) ===============
     ProviderSpec(
         name="anthropic",

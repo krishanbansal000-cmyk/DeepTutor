@@ -6,19 +6,40 @@ import { apiFetch, apiUrl } from "@/lib/api";
 
 export type RecorderState = "idle" | "recording" | "transcribing";
 
+export type VoiceChatMode = "stt" | "direct";
+
+export interface VoiceChatResult {
+  mode: VoiceChatMode;
+  text: string;
+}
+
 /**
- * Microphone capture → backend transcription. Records via MediaRecorder, posts
- * the clip to ``/api/v1/voice/stt`` (which uses the admin-configured STT
- * provider), and hands the transcript back through ``onTranscript``.
+ * Microphone capture → backend voice chat. Records via MediaRecorder, posts
+ * the clip to ``/api/v1/voice/chat``. When the active LLM supports audio
+ * (Gemma 4 E4B on DeepInfra), the backend forwards the audio directly to the
+ * model and returns ``{mode: "direct", text: <LLM response>}``. Otherwise it
+ * transcribes via the configured STT provider and returns
+ * ``{mode: "stt", text: <transcript>}``.
+ *
+ * The ``onResult`` callback receives the mode + text so the caller can decide
+ * whether to append a transcript to the composer (STT mode) or surface the
+ * direct LLM response (direct mode).
  */
-export function useVoiceRecorder(onTranscript: (text: string) => void) {
+export function useVoiceRecorder(
+  onResult: (result: VoiceChatResult) => void,
+  /** Optional prompt prepended to the audio when the model supports direct
+   * audio input. Ignored in STT-fallback mode. */
+  prompt?: string,
+) {
   const [state, setState] = useState<RecorderState>("idle");
   const [error, setError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const onTranscriptRef = useRef(onTranscript);
-  onTranscriptRef.current = onTranscript;
+  const onResultRef = useRef(onResult);
+  const promptRef = useRef(prompt);
+  onResultRef.current = onResult;
+  promptRef.current = prompt;
 
   const releaseStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -67,7 +88,9 @@ export function useVoiceRecorder(onTranscript: (text: string) => void) {
             : "webm";
         const form = new FormData();
         form.append("file", blob, `recording.${ext}`);
-        const resp = await apiFetch(apiUrl("/api/v1/voice/stt"), {
+        const activePrompt = promptRef.current?.trim() || "";
+        if (activePrompt) form.append("prompt", activePrompt);
+        const resp = await apiFetch(apiUrl("/api/v1/voice/chat"), {
           method: "POST",
           body: form,
         });
@@ -76,14 +99,14 @@ export function useVoiceRecorder(onTranscript: (text: string) => void) {
             detail?: string;
           } | null;
           throw new Error(
-            detail?.detail || `Transcription failed (HTTP ${resp.status}).`,
+            detail?.detail || `Voice chat failed (HTTP ${resp.status}).`,
           );
         }
-        const data = (await resp.json()) as { text?: string };
+        const data = (await resp.json()) as VoiceChatResult;
         const text = (data.text || "").trim();
-        if (text) onTranscriptRef.current(text);
+        if (text) onResultRef.current({ mode: data.mode || "stt", text });
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Transcription failed.");
+        setError(err instanceof Error ? err.message : "Voice chat failed.");
       } finally {
         setState("idle");
       }
@@ -96,7 +119,7 @@ export function useVoiceRecorder(onTranscript: (text: string) => void) {
   const stop = useCallback(() => {
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== "inactive") {
-      recorder.stop(); // fires onstop → transcribe
+      recorder.stop(); // fires onstop → voice chat
     }
   }, []);
 

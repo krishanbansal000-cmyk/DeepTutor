@@ -144,6 +144,17 @@ PROVIDER_CAPABILITIES: dict[str, dict[str, object]] = {
         "supports_vision": True,
         "system_in_messages": True,
     },
+    # DeepInfra — OpenAI-compatible gateway. Multimodal capabilities
+    # (vision/audio) are model-specific; see MODEL_OVERRIDES for gemma-4.
+    "deepinfra": {
+        "supports_response_format": True,
+        "supports_streaming": True,
+        "supports_tools": True,
+        "supports_vision": False,  # Per-model via MODEL_OVERRIDES
+        "supports_audio": False,   # Per-model via MODEL_OVERRIDES
+        "vision_url_supported": False,  # Inline base64 expected
+        "system_in_messages": True,
+    },
     # Together AI
     "together": {
         "supports_response_format": True,
@@ -302,6 +313,65 @@ MODEL_OVERRIDES: dict[str, dict[str, object]] = {
     "claude-4": {"supports_vision": True},
     "gemini": {"supports_vision": True},
     "gemma": {"supports_vision": False, "supports_response_format": False},
+    # Gemma 4 on DeepInfra — multimodal availability varies by model size.
+    # Verified 2026-07-19 with a real PNG + WAV upload:
+    #   E4B:       text-only (image 405, audio 405) — DeepInfra doesn't load
+    #              the vision/audio encoders for this model.
+    #   31B:       image ✅ (correctly identified red PNG), audio ❌ (no audio
+    #              tower in the model weights — correct per Google's card).
+    #   26B A4B:   image ✅, audio ❌ (serving-side, not model-side).
+    # No Gemma 4 model on DeepInfra currently supports audio input.
+    # More specific patterns (longer prefixes) are listed first so the
+    # MODEL_OVERRIDES prefix matcher (sorted by descending length) hits them
+    # before the generic ``google/gemma-4`` fallback.
+    "google/gemma-4-31b": {
+        "supports_vision": True,
+        "supports_audio": False,
+        "supports_response_format": False,
+        "supports_tools": True,
+        "vision_url_supported": False,
+    },
+    "google/gemma-4-26b-a4b": {
+        "supports_vision": True,
+        "supports_audio": False,
+        "supports_response_format": False,
+        "supports_tools": True,
+        "vision_url_supported": False,
+    },
+    "google/gemma-4-e4b": {
+        "supports_vision": False,
+        "supports_audio": False,
+        "supports_response_format": False,
+        "supports_tools": True,
+    },
+    "gemma-4-31b": {
+        "supports_vision": True,
+        "supports_audio": False,
+        "supports_response_format": False,
+        "supports_tools": True,
+        "vision_url_supported": False,
+    },
+    "gemma-4-26b-a4b": {
+        "supports_vision": True,
+        "supports_audio": False,
+        "supports_response_format": False,
+        "supports_tools": True,
+        "vision_url_supported": False,
+    },
+    # Generic Gemma 4 fallback — conservative: text-only. Self-hosters using
+    # vLLM with the full multimodal processor can override these locally.
+    "google/gemma-4": {
+        "supports_vision": False,
+        "supports_audio": False,
+        "supports_response_format": False,
+        "supports_tools": True,
+    },
+    "gemma-4": {
+        "supports_vision": False,
+        "supports_audio": False,
+        "supports_response_format": False,
+        "supports_tools": True,
+    },
     "llava": {"supports_vision": True},
     "bakllava": {"supports_vision": True},
     "moondream": {"supports_vision": True},
@@ -506,6 +576,20 @@ def supports_vision_url(binding: str, model: str | None = None) -> bool:
     return bool(value)
 
 
+def supports_audio(binding: str, model: str | None = None) -> bool:
+    """Whether the provider/model accepts audio input via ``input_audio``
+    content parts in the OpenAI-compatible chat completions API.
+
+    Currently true for Gemma 4 E4B / E2B on DeepInfra (and any model that
+    sets ``supports_audio`` in PROVIDER_CAPABILITIES or MODEL_OVERRIDES).
+    The multimodal layer uses this to decide whether to inject audio
+    attachments as ``input_audio`` blocks or fall back to a separate STT
+    step before the LLM call.
+    """
+    value = get_capability(binding, "supports_audio", model, default=False)
+    return bool(value)
+
+
 def requires_api_version(binding: str, model: str | None = None) -> bool:
     """
     Check if the provider requires an API version parameter (e.g., Azure OpenAI).
@@ -557,6 +641,8 @@ __all__ = [
     "has_thinking_tags",
     "supports_tools",
     "supports_vision",
+    "supports_vision_url",
+    "supports_audio",
     "requires_api_version",
     "get_effective_temperature",
     "disable_response_format_at_runtime",

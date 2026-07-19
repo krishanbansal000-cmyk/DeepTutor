@@ -36,7 +36,11 @@ from deeptutor.core.context import UnifiedContext
 from deeptutor.core.stream_bus import StreamBus
 from deeptutor.core.trace import build_trace_metadata, merge_trace_metadata, new_call_id
 from deeptutor.services.llm import clean_thinking_tags
-from deeptutor.services.llm.multimodal import should_degrade_to_text, strip_image_parts_inplace
+from deeptutor.services.llm.multimodal import (
+    should_degrade_to_text,
+    strip_audio_parts_inplace,
+    strip_image_parts_inplace,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from deeptutor.agents.chat.agentic_pipeline import AgenticChatPipeline
@@ -629,6 +633,22 @@ class AgentLoop:
                     ),
                 )
                 return await self.client.chat.completions.create(**kwargs)
+            if _is_audio_input_unsupported(exc):
+                stripped = strip_audio_parts_inplace(kwargs["messages"])
+                if stripped:
+                    await self.stream.progress(
+                        self.pipeline._t(
+                            "notices.audio_fallback",
+                            default="Model does not support audio input; retrying without audio.",
+                        ),
+                        source="chat",
+                        stage=stage,
+                        metadata=merge_trace_metadata(
+                            trace_meta,
+                            {"trace_kind": "warning", "audio_fallback": True},
+                        ),
+                    )
+                    return await self.client.chat.completions.create(**kwargs)
             raise
 
 
@@ -741,6 +761,20 @@ def _is_image_input_unsupported(exc: Exception) -> bool:
             "expected a string",
             "expected string",
             "invalid type for 'messages",
+        )
+    )
+
+
+def _is_audio_input_unsupported(exc: Exception) -> bool:
+    text = _error_text(exc)
+    return any(
+        marker in text
+        for marker in (
+            "audio",
+            "input_audio",
+            "voice",
+            "unsupported content type",
+            "unsupported modality",
         )
     )
 

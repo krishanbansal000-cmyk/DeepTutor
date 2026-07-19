@@ -48,7 +48,11 @@ from deeptutor.core.agentic.usage import UsageTracker
 from deeptutor.core.stream_bus import StreamBus
 from deeptutor.core.trace import merge_trace_metadata
 from deeptutor.services.llm import clean_thinking_tags
-from deeptutor.services.llm.multimodal import should_degrade_to_text, strip_image_parts_inplace
+from deeptutor.services.llm.multimodal import (
+    should_degrade_to_text,
+    strip_audio_parts_inplace,
+    strip_image_parts_inplace,
+)
 
 # Reasoning models (Qwen, Deepseek-R1 via certain proxies, etc.) sometimes
 # inline a literal ``<think>...</think>`` block in the content stream before
@@ -190,6 +194,27 @@ def _is_image_input_unsupported(exc: Exception) -> bool:
             "expected a string",
             "expected string",
             "invalid type for 'messages",
+        )
+    )
+
+
+def _is_audio_input_unsupported(exc: Exception) -> bool:
+    """Detect providers/models that reject ``input_audio`` content parts.
+
+    Mirrors :func:`_is_image_input_unsupported` for the audio path. Catches
+    explicit "audio" rejections and the generic structural errors a text-only
+    model raises when it receives a content array holding an ``input_audio``
+    block. Transient errors never mention these markers.
+    """
+    text = _error_text(exc)
+    return any(
+        marker in text
+        for marker in (
+            "audio",
+            "input_audio",
+            "voice",
+            "unsupported content type",
+            "unsupported modality",
         )
     )
 
@@ -511,6 +536,21 @@ async def run_labeled_step(
                     ),
                 )
                 return await client.chat.completions.create(**kwargs)
+            # Stage-2 audio fallback: the model rejected our input_audio
+            # content. Strip audio parts in place and retry text-only.
+            if _is_audio_input_unsupported(exc):
+                stripped = strip_audio_parts_inplace(kwargs["messages"])
+                if stripped:
+                    await stream.progress(
+                        "Model does not support audio input; retrying without audio.",
+                        source=source,
+                        stage=stage,
+                        metadata=merge_trace_metadata(
+                            iter_meta,
+                            {"trace_kind": "warning", "audio_fallback": True},
+                        ),
+                    )
+                    return await client.chat.completions.create(**kwargs)
             raise
 
     response_stream = await _create_response_stream()
